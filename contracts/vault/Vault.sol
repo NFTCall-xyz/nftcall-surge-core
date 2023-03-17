@@ -1,0 +1,322 @@
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity 0.8.17;
+
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {Pausable} from "@openzeppelin/contracts/security/Pausable.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {StorageSlot} from "@openzeppelin/contracts/utils/StorageSlot.sol";
+import {STRIKE_PRICE_GAP_LIST_SIZE, DURATION_LIST_SIZE, DataTypes} from "../libraries/DataTypes.sol";
+import {Errors} from "../libraries/Errors.sol";
+import {WadRayMath} from "../libraries/math/WadRayMath.sol";
+import {PercentageMath} from "../libraries/math/PercentageMath.sol";
+import {LPToken} from "../tokens/LPToken.sol";
+import {IOptionBase} from "../interfaces/IOptionBase.sol";
+import {IOracle} from "../interfaces/IOracle.sol";
+import {IPremium, PremiumVars} from "../interfaces/IPremium.sol";
+import {CallOptionToken} from "../tokens/CallOptionToken.sol";
+import {PutOptionToken} from "../tokens/PutOptionToken.sol";
+
+
+contract Vault is Pausable{
+    using StorageSlot for bytes32;
+    using PercentageMath for uint256;
+    using WadRayMath for uint256;
+    address private _asset;
+    address private _lpToken;
+    address private _oracle;
+    uint16 private _maximumCallUsage;
+    uint16 private _maximumPutUsage;
+    uint256 private _nextTokenId;
+    mapping(address => DataTypes.CollectionData) private _collections;
+    mapping(uint256 => address) private _collectionsList;
+    mapping(uint256 => DataTypes.OptionData) private _options;
+
+    uint256 private _collectionsCount;
+    uint256 private _currentCallUsage;
+    uint256 private _currentPutUsage;
+    uint256 private _totalLockedValue;
+    int256 private _unrealizedPNL;
+
+    uint256 private constant PRECISION = 1e5;
+    uint256 private constant RESERVE = 1e4; // 10%
+    uint256 private FEE_RATIO = 125; // 1.25%
+    uint256 private MAXIMUM_FEE_RATIO = 1250; // 12.5%
+    uint256 private constant MAXIMUM_WITHDRAW_RATIO = 5000; // 50%
+    uint256 private constant MAXIMUM_LOCK_RATIO = 9500; // 95%
+
+    function STRIKE_PRICE_GAP(uint8 strikePriceGapIdx) public pure returns(uint256) {
+        uint24[STRIKE_PRICE_GAP_LIST_SIZE] memory strikePriceGaps = [0, 1e4, 2*1e4, 3*1e4, 5*1e4, 1e5]; // [0% 10% 20% 30% 50% 100%]
+        return uint256(strikePriceGaps[strikePriceGapIdx]);
+    }
+
+    function DURATION(uint8 durationIdx) public pure returns(uint40) {
+        uint40[DURATION_LIST_SIZE] memory durations = [uint40(3 days), uint40(7 days), uint40(14 days), uint40(28 days)];
+        return uint40(durations[durationIdx]);
+    }
+
+    function PNL() public view returns(int256) {
+        return _unrealizedPNL;
+    }
+
+    function unrealizedPNL() public view returns(int256) {
+        return _unrealizedPNL;
+    }
+
+    //for LP
+    function deposit(uint256 amount, address onBehalfOf) public {
+        //mint NLP token
+        //transfer _asset from caller to the NLP token
+        if(amount == 0) {
+            revert();
+        }
+        LPToken(_lpToken).mint(onBehalfOf, amount);
+    }
+
+    function withdraw(uint256 amount, address to) public returns(uint256){
+        //burn NLP token
+        //transfer _asset from the NLP token to caller
+        if(amount == 0) {
+            revert();
+        }
+        address user = msg.sender;
+        uint256 userBalance = _getMaximumWithdrawAmount(user);
+        uint256 amountToWithdraw = amount;
+        if(amount == type(uint256).max){
+            amountToWithdraw = userBalance;
+        }
+        if(amount > userBalance){
+            revert();
+        }
+        LPToken(_lpToken).burn(msg.sender, to, amountToWithdraw);
+        return(amountToWithdraw);
+    }
+
+    function _getMaximumWithdrawAmount(address user) internal view returns(uint256) {
+        LPToken lpToken = LPToken(_lpToken);
+        uint256 userBalance = lpToken.balanceOf(user);
+        if(userBalance == 0) {
+            revert();
+        }
+        userBalance = lpToken.convertToAssets(userBalance);
+        uint256 maximumWithdrawBalance = (IERC20(_asset).balanceOf(_lpToken) - _totalLockedValue).percentMul(MAXIMUM_WITHDRAW_RATIO);
+        return (userBalance > maximumWithdrawBalance) ? maximumWithdrawBalance : userBalance;
+    }
+
+    function _validateOpenOption1(uint256 amount, uint8 strikePriceIdx, uint8 durationIdx) internal pure {
+        if(amount == 0){
+            revert();
+        }
+        if(strikePriceIdx >= STRIKE_PRICE_GAP_LIST_SIZE) {
+            revert();
+        }
+        if(durationIdx >= DURATION_LIST_SIZE) {
+            revert();
+        } 
+    }
+
+    function _validateOpenOption2(DataTypes.CollectionConfiguration storage collection, uint256 valueToBeLocked, uint256 premium) internal view
+    {
+        uint256 currentAmount = IERC20(_asset).balanceOf(_lpToken) + premium;
+        if(_totalValue(collection) + valueToBeLocked > currentAmount.percentMul(collection.weight)){
+            revert();
+        }
+        if(_totalLockedValue + valueToBeLocked > currentAmount.percentMul(MAXIMUM_LOCK_RATIO)){
+            revert();
+        }
+    }
+
+    //for options
+    function openCall(address collection, address onBehalfOf, uint256 amount, uint8 strikePriceIdx, uint8 durationIdx) public returns(uint256 tokenId){
+        _validateOpenOption1(amount, strikePriceIdx, durationIdx);
+        DataTypes.CollectionConfiguration storage config = _collections[collection].config;
+        DataTypes.CollectionData memory data = _collections[collection];
+        //calculate premium
+        (uint256 currentPrice, uint256 vol) = IOracle(_oracle).getAssetPriceAndVol(collection);
+        uint256 premium = _calculateCallPremium(data, currentPrice, vol, amount, strikePriceIdx, durationIdx);
+        uint256 strikePrice = _callStrikePrice(currentPrice, strikePriceIdx);
+        uint256 valueToBeLocked = currentPrice.wadMul(amount);
+        uint40 expirationTime = uint40(block.timestamp) + DURATION(durationIdx);
+        _validateOpenOption2(config, valueToBeLocked, premium);
+        _totalLockedValue += valueToBeLocked;
+        _realizedPNL += int256(premium);
+        data.realizedPNL += int256(premium);
+        _collections[collection] = data;
+        //mint callOption token
+        tokenId = _addNewToken();
+        _options[tokenId] = DataTypes.OptionData(0, strikePriceIdx, durationIdx, collection, amount, expirationTime, currentPrice);
+        CallOptionToken(config.callToken).mint(onBehalfOf, strikePriceIdx, durationIdx, expirationTime, strikePrice, tokenId, amount);
+        //transfer premium from the caller to the vault
+        if(!IERC20(_asset).transferFrom(msg.sender, _lpToken, premium)){
+            revert();
+        }
+        //return the tokenId
+    }
+
+    function openPut(address collection, address onBehalfOf, uint256 amount, uint8 strikePriceIdx, uint8 durationIdx) public returns(uint256 tokenId){
+        _validateOpenOption1(amount, strikePriceIdx, durationIdx);
+        DataTypes.CollectionConfiguration storage config = _collections[collection].config;
+        DataTypes.CollectionData memory data = _collections[collection];
+        //calculate premium
+        (uint256 currentPrice, uint256 vol) = IOracle(_oracle).getAssetPriceAndVol(collection);
+        uint256 premium = _calculatePutPremium(data, currentPrice, vol, amount, strikePriceIdx, durationIdx);
+        uint256 strikePrice = _putStrikePrice(currentPrice, strikePriceIdx);
+        uint256 valueToBeLocked = strikePrice.wadMul(amount);
+        uint40 expirationTime = uint40(block.timestamp) + DURATION(durationIdx);
+        _validateOpenOption2(config, valueToBeLocked, premium);
+        _totalLockedValue += valueToBeLocked;
+        _realizedPNL += int256(premium);
+        data.realizedPNL += int256(premium);
+        _collections[collection] = data;
+        //mint putOption token
+        tokenId = _addNewToken();
+        _options[tokenId] = DataTypes.OptionData(0, strikePriceIdx, durationIdx, collection, amount, expirationTime, currentPrice);
+        PutOptionToken(config.putToken).mint(onBehalfOf, strikePriceIdx, durationIdx, expirationTime, strikePrice, tokenId, amount);
+        //transfer premium from the caller to the vault
+        if(!IERC20(_asset).transferFrom(msg.sender, _lpToken, premium)){
+            revert();
+        }
+        //return the tokenId
+    }
+
+    // TODO added batch operations for exercise
+
+    function exerciseCall(address collection, address to, uint256 tokenId) public returns(uint256 profit){
+        //calculate fee
+        //burn callOption token
+        //transfer revenue from the vault to caller
+        DataTypes.CollectionData memory collectionData = _collections[collection];
+        DataTypes.OptionData storage optionData = _options[tokenId];
+        if(block.timestamp < optionData.expirationTime) {
+            revert();
+        }
+        uint256 currentPrice = IOracle(_oracle).getAssetPrice(collection);
+        uint256 strikePrice = _strikePrice(optionData);
+        profit = _calculateExerciseCallProfit(currentPrice, strikePrice, optionData.amount);
+        _totalLockedValue -= optionData.openPrice.wadMul(optionData.amount);
+        delete _options[tokenId];
+        CallOptionToken(collectionData.config.callToken).burn(tokenId);
+        if(profit != 0){
+            _realizedPNL -= int256(profit);
+            collectionData.realizedPNL -= int256(profit);
+            _collections[collection] = collectionData;
+            if(!IERC20(_asset).transferFrom(_lpToken, to, profit)){
+                revert();
+            }
+        }
+    }
+
+    function exercisePut(address collection, address to, uint256 tokenId) public returns(uint256 profit){
+        //calculate fee
+        //burn putOption token
+        //transfer revenue from the vault to caller
+        //calculate fee
+        //burn callOption token
+        //transfer revenue from the vault to caller
+        DataTypes.CollectionData memory collectionData = _collections[collection];
+        DataTypes.OptionData storage optionData = _options[tokenId];
+        if(block.timestamp < optionData.expirationTime) {
+            revert();
+        }
+        uint256 currentPrice = IOracle(_oracle).getAssetPrice(collection);
+        uint256 strikePrice = _strikePrice(optionData);
+        profit = _calculateExercisePutProfit(currentPrice, strikePrice, optionData.amount);
+        _totalLockedValue -= strikePrice.wadMul(optionData.amount);
+        delete _options[tokenId];
+        PutOptionToken(collectionData.config.putToken).burn(tokenId);
+        if(profit != 0){
+            _realizedPNL -= int256(profit);
+            collectionData.realizedPNL -= int256(profit);
+            _collections[collection] = collectionData;
+            if(!IERC20(_asset).transferFrom(_lpToken, to, profit)){
+                revert();
+            }
+        }
+    }
+
+    /*function previewOpenCall(address collection, uint256 amount, uint256 strikePriceIdx, uint256 durationIdx) external view returns(uint256 strikePrice, uint256 premium, uint256 errorCode) {
+
+
+    }
+
+    function previewOpenPut(address collection, uint256 amount, uint256 strikePriceIdx, uint256 durationIdx) external view returns(uint256 strikePrice, uint256 premium, uint256 errorCode) {
+
+    }*/
+
+    function _calculateExerciseCallProfit(uint256 currentPrice, uint256 strikePrice, uint256 amount) internal view returns(uint256){
+        if(currentPrice <= strikePrice) {
+            return 0;
+        }
+        uint256 profit = currentPrice - strikePrice;
+        if(profit > strikePrice){
+            profit = strikePrice;
+        }
+        profit = profit.wadMul(amount);
+        uint256 fee = currentPrice.wadMul(amount).percentMul(FEE_RATIO);
+        uint256 maximumFee = profit.percentMul(MAXIMUM_FEE_RATIO);
+        if(fee > maximumFee){
+            return profit - maximumFee;
+        }
+        else {
+            return profit - fee;
+        }
+    }
+
+    function _calculateExercisePutProfit(uint256 currentPrice, uint256 strikePrice, uint256 amount) internal view returns(uint256){
+        if(currentPrice >= strikePrice) {
+            return 0;
+        }
+        uint256 profit = (strikePrice - currentPrice).wadMul(amount);
+        uint256 fee = currentPrice.wadMul(amount).percentMul(FEE_RATIO);
+        uint256 maximumFee = profit.percentMul(MAXIMUM_FEE_RATIO);
+        if(fee > maximumFee){
+            return profit - maximumFee;
+        }
+        else {
+            return profit - fee;
+        }
+    }
+
+    function _calculateCallPremium(DataTypes.CollectionData memory collection, uint256 currentPrice, uint256 vol, uint256 amount, uint8 strikePriceGapIndex, uint8 durationIndex) internal view returns(uint256 premium ) {
+        uint256 totalBalance = IERC20(_asset).balanceOf(_lpToken);
+        uint16 vaultUtilization = uint16(_totalLockedValue.percentDiv(totalBalance));
+        uint256 collectionLockedValue = CallOptionToken(collection.config.callToken).totalValue() + PutOptionToken(collection.config.putToken).totalValue();
+        uint16 collectionUtilization = uint16(collectionLockedValue.percentDiv(totalBalance).percentDiv(collection.config.weight));
+        PremiumVars memory vars = PremiumVars(strikePriceGapIndex, durationIndex, vaultUtilization, collectionUtilization, currentPrice, vol, amount, collection.delta, collection.realizedPNL);
+        return IPremium(collection.config.premium).getCallPremium(vars);
+    }
+
+    function _calculatePutPremium(DataTypes.CollectionData memory collection, uint256 currentPrice, uint256 vol, uint256 amount, uint8 strikePriceGapIndex, uint8 durationIndex) internal view returns(uint256 premium ) {
+        uint256 totalBalance = IERC20(_asset).balanceOf(_lpToken);
+        uint16 vaultUtilization = uint16(_totalLockedValue.percentDiv(totalBalance));
+        uint256 collectionLockedValue = CallOptionToken(collection.config.callToken).totalValue() + PutOptionToken(collection.config.putToken).totalValue();
+        uint16 collectionUtilization = uint16(collectionLockedValue.percentDiv(totalBalance).percentDiv(collection.config.weight));
+        PremiumVars memory vars = PremiumVars(strikePriceGapIndex, durationIndex, vaultUtilization, collectionUtilization, currentPrice, vol, amount, collection.delta, collection.realizedPNL);
+        return IPremium(collection.config.premium).getPutPremium(vars);
+    }
+
+    function _totalValue(DataTypes.CollectionConfiguration storage collectionData) internal view returns(uint256){
+        return CallOptionToken(collectionData.callToken).totalValue() + PutOptionToken(collectionData.putToken).totalValue();
+    }
+
+    function _addNewToken() internal returns (uint256 tokenId) {
+        tokenId = _nextTokenId;
+        _nextTokenId += 1;
+    }
+
+    function _callStrikePrice(uint256 currentPrice, uint8 strikePriceGapIndex) internal pure returns(uint256){
+        return currentPrice.percentMul(PercentageMath.PERCENTAGE_FACTOR + STRIKE_PRICE_GAP(strikePriceGapIndex));
+    }
+
+    function _putStrikePrice(uint256 currentPrice, uint8 strikePriceGapIndex) internal pure returns(uint256){
+        return currentPrice.percentMul(PercentageMath.PERCENTAGE_FACTOR - STRIKE_PRICE_GAP(strikePriceGapIndex));
+    }
+
+    function _strikePrice(DataTypes.OptionData storage optionData) internal view returns(uint256) {
+        if(optionData.optionType == 0){
+            return _callStrikePrice(optionData.openPrice, optionData.strikePriceGapIndex);
+        }
+        else {
+            return _putStrikePrice(optionData.openPrice, optionData.strikePriceGapIndex);
+        }
+    }
+}
