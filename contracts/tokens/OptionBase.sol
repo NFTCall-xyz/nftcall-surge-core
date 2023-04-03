@@ -21,6 +21,7 @@ abstract contract OptionBase is IOptionBase, ERC721Enumerable, Ownable {
     struct OptionData {
         uint8 strikePriceIndex;
         uint8 durationIndex;
+        bool isQueued;
         uint40 endTime;
         uint256 strikePrice;
         uint256 amount;
@@ -57,7 +58,7 @@ abstract contract OptionBase is IOptionBase, ERC721Enumerable, Ownable {
 
     function mint(address to, uint8 strikePriceIndex, uint8 durationIndex, uint40 endTime, uint256 strikePrice, uint256 tokenId, uint256 amount) public override onlyOwner
     {
-        _options[tokenId] = OptionData(strikePriceIndex, durationIndex, endTime, strikePrice, amount);
+        _options[tokenId] = OptionData(strikePriceIndex, durationIndex, true, endTime, strikePrice, amount);
         // TODO: the locked value of a call option should be the openPrice
         _totalValue += strikePrice;
         emit OptionPositionOpened(to, tokenId, strikePriceIndex, durationIndex, endTime, strikePrice, amount);

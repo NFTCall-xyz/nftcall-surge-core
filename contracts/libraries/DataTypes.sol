@@ -6,13 +6,14 @@ uint256 constant DURATION_LIST_SIZE = 4;
 
 library DataTypes {
     struct OptionData {
-        uint8 optionType; // 0 - call, 1 - put
+        uint8 optionType; // 0 - call, 1 - put, 2 - queued call, 3 - queued put
         uint8 strikePriceGapIndex;
         uint8 durationIndex;
         address collection;
         uint256 amount;
-        uint256 expirationTime;
+        uint256 expiration;
         uint256 openPrice;
+        uint256 premium;
     }
 
     struct CollectionConfiguration {
@@ -26,7 +27,7 @@ library DataTypes {
 
     struct CollectionData {
         CollectionConfiguration config;
-        uint256 delta;
+        int256 delta;
         int256 unrealizedPNL;
     }
 

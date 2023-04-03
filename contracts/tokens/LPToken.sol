@@ -14,6 +14,10 @@ contract LPToken is ILPToken, ERC4626, Ownable {
 
     }
 
+    function lockedBalanceOf(address user) public override view returns(uint256) {
+        return 0;
+    }
+
     function mint(address onBehalfOf, uint256 amount) public override onlyOwner
     {
 

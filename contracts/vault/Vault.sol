@@ -24,8 +24,10 @@ contract Vault is Pausable{
     address private _asset;
     address private _lpToken;
     address private _oracle;
+    address private _reserve;
     uint16 private _maximumCallUsage;
     uint16 private _maximumPutUsage;
+    uint40 private _lastUpdateTimestamp;
     uint256 private _nextTokenId;
     mapping(address => DataTypes.CollectionData) private _collections;
     mapping(uint256 => address) private _collectionsList;
@@ -35,10 +37,11 @@ contract Vault is Pausable{
     uint256 private _currentCallUsage;
     uint256 private _currentPutUsage;
     uint256 private _totalLockedValue;
+    uint256 private _maximumVaultSize;
+    int256 private _realizedPNL;
     int256 private _unrealizedPNL;
 
-    uint256 private constant PRECISION = 1e5;
-    uint256 private constant RESERVE = 1e4; // 10%
+    uint256 private constant RESERVE_RATIO = 1000; // 10%
     uint256 private FEE_RATIO = 125; // 1.25%
     uint256 private MAXIMUM_FEE_RATIO = 1250; // 12.5%
     uint256 private constant MAXIMUM_WITHDRAW_RATIO = 5000; // 50%
@@ -58,42 +61,51 @@ contract Vault is Pausable{
         return _unrealizedPNL;
     }
 
-    function unrealizedPNL() public view returns(int256) {
-        return _unrealizedPNL;
-    }
-
-    //for LP
     function deposit(uint256 amount, address onBehalfOf) public {
-        //mint NLP token
-        //transfer _asset from caller to the NLP token
+        // check if amount is 0
         if(amount == 0) {
             revert();
         }
+        // check if the sum of all lpTokens and amount is greater than the upper limit
+        if(LPToken(_lpToken).totalSupply() + amount > _maximumVaultSize) {
+            revert();
+        }
+        //mint NLP token
+        //transfer _asset from caller to the NLP token
         LPToken(_lpToken).mint(onBehalfOf, amount);
     }
 
     function withdraw(uint256 amount, address to) public returns(uint256){
-        //burn NLP token
-        //transfer _asset from the NLP token to caller
+        // check if amount is 0
         if(amount == 0) {
             revert();
         }
+
         address user = msg.sender;
         uint256 userBalance = _getMaximumWithdrawAmount(user);
         uint256 amountToWithdraw = amount;
         if(amount == type(uint256).max){
             amountToWithdraw = userBalance;
         }
+
+        // check if the amount is greater than the maximum withdrawable amount
         if(amount > userBalance){
             revert();
         }
+
+        //burn NLP token
+        //transfer _asset from the NLP token to caller
         LPToken(_lpToken).burn(msg.sender, to, amountToWithdraw);
         return(amountToWithdraw);
     }
 
+    // The maximum withdrawable amount is the minimum of the user's unlocked balance 
+    // and the maximum withdrawable amount calculated by the formula below:
+    // (total asset balance - total locked value) * MAXIMUM_WITHDRAW_RATIO / 10000
     function _getMaximumWithdrawAmount(address user) internal view returns(uint256) {
+        
         LPToken lpToken = LPToken(_lpToken);
-        uint256 userBalance = lpToken.balanceOf(user);
+        uint256 userBalance = lpToken.balanceOf(user) - lpToken.lockedBalanceOf(user);
         if(userBalance == 0) {
             revert();
         }
@@ -138,15 +150,17 @@ contract Vault is Pausable{
         uint40 expirationTime = uint40(block.timestamp) + DURATION(durationIdx);
         _validateOpenOption2(config, valueToBeLocked, premium);
         _totalLockedValue += valueToBeLocked;
-        _realizedPNL += int256(premium);
-        data.realizedPNL += int256(premium);
         _collections[collection] = data;
         //mint callOption token
         tokenId = _addNewToken();
-        _options[tokenId] = DataTypes.OptionData(0, strikePriceIdx, durationIdx, collection, amount, expirationTime, currentPrice);
+        _options[tokenId] = DataTypes.OptionData(2, strikePriceIdx, durationIdx, collection, amount, expirationTime, currentPrice, premium);
         CallOptionToken(config.callToken).mint(onBehalfOf, strikePriceIdx, durationIdx, expirationTime, strikePrice, tokenId, amount);
         //transfer premium from the caller to the vault
-        if(!IERC20(_asset).transferFrom(msg.sender, _lpToken, premium)){
+        uint256 amountToReserve = premium.percentMul(RESERVE_RATIO);
+        if(!IERC20(_asset).transferFrom(msg.sender, _reserve, amountToReserve)){
+            revert();
+        }
+        if(!IERC20(_asset).transferFrom(msg.sender, _lpToken, premium - amountToReserve)){
             revert();
         }
         //return the tokenId
@@ -164,15 +178,17 @@ contract Vault is Pausable{
         uint40 expirationTime = uint40(block.timestamp) + DURATION(durationIdx);
         _validateOpenOption2(config, valueToBeLocked, premium);
         _totalLockedValue += valueToBeLocked;
-        _realizedPNL += int256(premium);
-        data.realizedPNL += int256(premium);
         _collections[collection] = data;
         //mint putOption token
         tokenId = _addNewToken();
-        _options[tokenId] = DataTypes.OptionData(0, strikePriceIdx, durationIdx, collection, amount, expirationTime, currentPrice);
+        _options[tokenId] = DataTypes.OptionData(3, strikePriceIdx, durationIdx, collection, amount, expirationTime, currentPrice, premium);
         PutOptionToken(config.putToken).mint(onBehalfOf, strikePriceIdx, durationIdx, expirationTime, strikePrice, tokenId, amount);
         //transfer premium from the caller to the vault
-        if(!IERC20(_asset).transferFrom(msg.sender, _lpToken, premium)){
+        uint256 amountToReserve = premium.percentMul(RESERVE_RATIO);
+        if(!IERC20(_asset).transferFrom(msg.sender, _reserve, amountToReserve)){
+            revert();
+        }
+        if(!IERC20(_asset).transferFrom(msg.sender, _lpToken, premium - amountToReserve)){
             revert();
         }
         //return the tokenId
@@ -186,18 +202,18 @@ contract Vault is Pausable{
         //transfer revenue from the vault to caller
         DataTypes.CollectionData memory collectionData = _collections[collection];
         DataTypes.OptionData storage optionData = _options[tokenId];
-        if(block.timestamp < optionData.expirationTime) {
+        if(block.timestamp < optionData.expiration) {
             revert();
         }
         uint256 currentPrice = IOracle(_oracle).getAssetPrice(collection);
         uint256 strikePrice = _strikePrice(optionData);
         profit = _calculateExerciseCallProfit(currentPrice, strikePrice, optionData.amount);
         _totalLockedValue -= optionData.openPrice.wadMul(optionData.amount);
+        _realizedPNL += int256(_options[tokenId].premium);
         delete _options[tokenId];
         CallOptionToken(collectionData.config.callToken).burn(tokenId);
         if(profit != 0){
             _realizedPNL -= int256(profit);
-            collectionData.realizedPNL -= int256(profit);
             _collections[collection] = collectionData;
             if(!IERC20(_asset).transferFrom(_lpToken, to, profit)){
                 revert();
@@ -214,18 +230,18 @@ contract Vault is Pausable{
         //transfer revenue from the vault to caller
         DataTypes.CollectionData memory collectionData = _collections[collection];
         DataTypes.OptionData storage optionData = _options[tokenId];
-        if(block.timestamp < optionData.expirationTime) {
+        if(block.timestamp < optionData.expiration) {
             revert();
         }
         uint256 currentPrice = IOracle(_oracle).getAssetPrice(collection);
         uint256 strikePrice = _strikePrice(optionData);
         profit = _calculateExercisePutProfit(currentPrice, strikePrice, optionData.amount);
         _totalLockedValue -= strikePrice.wadMul(optionData.amount);
+        _realizedPNL += int256(_options[tokenId].premium);
         delete _options[tokenId];
         PutOptionToken(collectionData.config.putToken).burn(tokenId);
         if(profit != 0){
             _realizedPNL -= int256(profit);
-            collectionData.realizedPNL -= int256(profit);
             _collections[collection] = collectionData;
             if(!IERC20(_asset).transferFrom(_lpToken, to, profit)){
                 revert();
@@ -241,6 +257,46 @@ contract Vault is Pausable{
     function previewOpenPut(address collection, uint256 amount, uint256 strikePriceIdx, uint256 durationIdx) external view returns(uint256 strikePrice, uint256 premium, uint256 errorCode) {
 
     }*/
+
+    function _updatePNLAndDelta() public {
+        _updatePNL();
+        _updateDelta();
+        _lastUpdateTimestamp = uint40(IOracle(_oracle).getUpdateTimestampForVaultData(address(this));
+    }
+
+    function _updatePNL() internal {
+        int256 totalPNL = 0;
+        // update all collections' PNL
+        for(uint256 i = 0; i < _collectionsCount; i++){
+            address collection = _collectionsList[i];
+            DataTypes.CollectionData memory collectionData = _collections[collection];
+            // TODO should not use the Oracle, because it is not the same for all Vaults.
+            int256 newPNL = IOracle(_oracle).getPNL(address(this), collection);
+            totalPNL += newPNL;
+            _updatePNL(collection, newPNL);
+        }
+        _unrealizedPNL = totalPNL;
+    }
+
+    function _updatePNL(address collection, int256 newPNL) internal {
+        // update the new PNL
+        _collections[collection].unrealizedPNL = newPNL;
+    }
+
+    function _updateDelta() internal {
+        // update all collections' PNL
+        for(uint256 i = 0; i < _collectionsCount; i++){
+            address collection = _collectionsList[i];
+            DataTypes.CollectionData memory collectionData = _collections[collection];
+            // TODO should not use the Oracle, because it is not the same for all Vaults.
+            int256 newDelta = IOracle(_oracle).getDelta(address(this), collection);
+            _updateDelta(collection, newDelta);
+        }
+    }
+
+    function _updateDelta(address collection, int256 delta) internal {
+        _collections[collection].delta = delta;
+    }
 
     function _calculateExerciseCallProfit(uint256 currentPrice, uint256 strikePrice, uint256 amount) internal view returns(uint256){
         if(currentPrice <= strikePrice) {
