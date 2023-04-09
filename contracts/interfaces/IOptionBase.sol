@@ -1,15 +1,45 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.17;
 
+enum OptionType {
+    LONG_CALL,
+    LONG_PUT
+}
+
+enum PositionState {
+    EMPTY,
+    PENDING,
+    ACTIVE,
+    CLOSED
+}
+
+struct OptionPosition {
+    uint256 strikeId;
+    PositionState state;
+    uint256 amount;
+}
+
 interface IOptionBase {
     
-    event OptionPositionOpened(address indexed to, uint256 indexed tokenId, uint8 strikePriceIndex, uint8 durationIndex, uint40 endTime, uint256 strikePrice, uint256 amount);
-    event Mint(address indexed to, uint256 indexed tokenId);
-    event Burn(address indexed owner, uint256 indexed tokenId);
+    event Initialize(address indexed vault);
+    event UpdateBaseURI(string baseURI);
 
-    function mint(address to, uint8 strikePriceIndex, uint8 durationIndex, uint40 endTime, uint256 strikePrice, uint256 amount, uint256 tokenId) external;
-    function burn(uint256 tokenId) external;
-
+    function vault() external view returns(address);
+    function setBaseURI(string memory baseURI) external;
+    function openPosition(address to, uint256 strikeId, uint256 amount) external returns(uint256 positionId);
+    function activePosition(uint256 positionId) external;
+    function closePosition(uint256 positionId) external;
+    function forceClosePosition(uint256 positionId) external;
+    function optionPositionState(uint256 positionId) external view returns(PositionState);
+    function optionPosition(uint256 positionId) external view returns(OptionPosition memory);
+    function strikePrice(uint256 positionId) external view returns(uint256);
+    function spotPrice(uint256 positionId) external view returns(uint256);
+    function totalPendingValue() external view returns(uint256);
     function totalValue() external view returns(uint256);
 
+    error OnlyVault(address thrower, address caller, address vault);
+    error ZeroVaultAddress(address thrower);
+    error ZeroAmount(address thrower);
+    error IsNotPending(address thrower, uint256 positionId, PositionState state);
+    error IsNotActive(address thrower, uint256 positionId, PositionState state);
 }

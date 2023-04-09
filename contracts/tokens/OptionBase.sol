@@ -4,50 +4,50 @@ pragma solidity 0.8.17;
 import {IERC721Metadata, ERC721, ERC721Enumerable} from "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-import {IOptionBase} from "../interfaces/IOptionBase.sol";
+import {IVault} from "../interfaces/IVault.sol";
+import {OptionType, PositionState, OptionPosition, IOptionBase} from "../interfaces/IOptionBase.sol";
+import {SimpleInitializable} from "../libraries/SimpleInitializable.sol";
 
-abstract contract OptionBase is IOptionBase, ERC721Enumerable, Ownable {
+abstract contract OptionBase is IOptionBase, ERC721Enumerable, Ownable, SimpleInitializable {
     using Strings for uint256;
+    using Math for uint256;
 
     address public immutable collection;
+    address private _vault;
+    uint256 internal constant _decimals = 18;
     uint256 private _totalValue;
-    string private _namePrefix;
-    string private _namePostfix;
-    string private _symbolPrefix;
-    string private _symbolPostfix;
+    uint256 private _totalPendingValue;
+    uint256 private _nextId = 1;
     string private _baseTokenURI;
 
-    struct OptionData {
-        uint8 strikePriceIndex;
-        uint8 durationIndex;
-        bool isQueued;
-        uint40 endTime;
-        uint256 strikePrice;
-        uint256 amount;
+    mapping(uint256 => OptionPosition) internal _options;
+
+    modifier onlyVault() {
+        if (msg.sender != _vault) {
+            revert OnlyVault(address(this), msg.sender, _vault);
+        }
+        _;
     }
 
-    mapping(uint256 => OptionData) internal _options;
-
-    constructor(address collectionAddress, string memory namePrefix, string memory namePostfix, string memory symbolPrefix, string memory symbolPostfix, string memory baseURI)
-        ERC721("", "") Ownable()
+    constructor(address collectionAddress, string memory name_, string memory symbol_, string memory baseURI)
+        ERC721(name_, symbol_) Ownable()
     {
         collection = collectionAddress;
-        _namePrefix = namePrefix;
-        _namePostfix = namePostfix;
-        _symbolPrefix = symbolPrefix;
-        _symbolPostfix = symbolPostfix;
         _baseTokenURI = baseURI;
     }
 
-    function name() public view override returns(string memory) 
-    {
-        return string(abi.encodePacked(_namePrefix, IERC721Metadata(collection).name(), _namePostfix));
+    function initialize(address vaultAddress) public onlyOwner initializer {
+        if(vaultAddress == address(0)){
+            revert ZeroVaultAddress(address(this));
+        }
+        _vault = vaultAddress;
+        emit Initialize(vaultAddress);
     }
 
-    function symbol() public view override returns(string memory) 
-    {
-        return string(abi.encodePacked(_symbolPrefix, IERC721Metadata(collection).symbol(), _symbolPostfix));
+    function vault() public view override returns(address) {
+        return _vault;
     }
 
     function tokenURI(uint256 tokenId) public view override returns (string memory) 
@@ -56,28 +56,98 @@ abstract contract OptionBase is IOptionBase, ERC721Enumerable, Ownable {
         return bytes(baseURI).length > 0 ? string(abi.encodePacked(baseURI, tokenId.toString())) : "";
     }
 
-    function mint(address to, uint8 strikePriceIndex, uint8 durationIndex, uint40 endTime, uint256 strikePrice, uint256 tokenId, uint256 amount) public override onlyOwner
-    {
-        _options[tokenId] = OptionData(strikePriceIndex, durationIndex, true, endTime, strikePrice, amount);
-        // TODO: the locked value of a call option should be the openPrice
-        _totalValue += strikePrice;
-        emit OptionPositionOpened(to, tokenId, strikePriceIndex, durationIndex, endTime, strikePrice, amount);
-        emit Mint(to, tokenId);
-        _safeMint(to, tokenId);
+    function setBaseURI(string memory baseURI) public override onlyOwner {
+        _baseTokenURI = baseURI;
+        emit UpdateBaseURI(baseURI);
     }
 
-    function burn(uint256 tokenId) public override onlyOwner
+    function openPosition(address to, uint256 strikeId, uint256 amount) public override onlyVault returns(uint256)
     {
-        address owner = ERC721.ownerOf(tokenId);
-        // TODO: the locked value of a call option should be the openPrice
-        _totalValue -= _options[tokenId].strikePrice;
-        emit Burn(owner, tokenId);
-        delete _options[tokenId];
-        _burn(tokenId);
+        if(amount == 0) {
+            revert ZeroAmount(address(this));
+        }
+        uint256 positionId = _nextId++;
+        _options[positionId] = OptionPosition(strikeId, PositionState.PENDING, amount);
+        if(_optionType() == OptionType.LONG_CALL) {
+            _totalPendingValue += spotPrice(positionId);
+        } else {
+            _totalPendingValue += strikePrice(positionId);
+        }
+        _safeMint(to, positionId);
+        return positionId;
+    }
+
+    function activePosition(uint256 positionId) public override onlyVault
+    {
+        OptionPosition storage po = _options[positionId];
+        if(po.state != PositionState.PENDING) {
+            revert IsNotPending(address(this), positionId, po.state);
+        }
+        if(_optionType() == OptionType.LONG_CALL) {
+            _totalPendingValue -= spotPrice(positionId);
+            _totalValue += spotPrice(positionId);
+        } else {
+            _totalPendingValue -= strikePrice(positionId);
+            _totalValue += strikePrice(positionId);
+        }
+        po.state = PositionState.ACTIVE;
+    }
+
+    function closePosition(uint256 positionId) public override onlyVault
+    {
+        if(_options[positionId].state != PositionState.ACTIVE) {
+            revert IsNotActive(address(this), positionId, _options[positionId].state);
+        }
+        if(_optionType() == OptionType.LONG_CALL) {
+            _totalValue -= spotPrice(positionId);
+        } else {
+            _totalValue -= strikePrice(positionId);
+        }
+        delete _options[positionId];
+        _burn(positionId);
+    }
+
+    function forceClosePosition(uint256 positionId) public override onlyVault
+    {
+        if(_options[positionId].state != PositionState.PENDING) {
+            revert IsNotPending(address(this), positionId, _options[positionId].state);
+        }
+        if(_optionType() == OptionType.LONG_CALL) {
+            _totalPendingValue -= spotPrice(positionId);
+        } else {
+            _totalPendingValue -= strikePrice(positionId);
+        }
+        delete _options[positionId];
+        _burn(positionId);
     }
 
     function totalValue() public override view returns(uint256) 
     {
         return(_totalValue);
     }
+
+    function totalPendingValue() public override view returns(uint256) 
+    {
+        return(_totalPendingValue);
+    }
+
+    function strikePrice(uint256 positionId) public view override returns(uint256) {
+        OptionPosition memory po = _options[positionId];
+        return IVault(_vault).strike(po.strikeId).strikePrice.mulDiv(po.amount, 10 ** _decimals, Math.Rounding.Up);
+    }
+
+    function spotPrice(uint256 positionId) public view override returns(uint256) {
+        OptionPosition memory po = _options[positionId];
+        return IVault(_vault).strike(po.strikeId).spotPrice.mulDiv(po.amount, 10 ** _decimals, Math.Rounding.Up);
+    }
+
+    function optionPosition(uint256 positionId) public view override returns(OptionPosition memory) {
+        return _options[positionId];
+    }
+
+    function optionPositionState(uint256 positionId) public view override returns(PositionState) {
+        return _options[positionId].state;
+    }
+
+    function _optionType() internal pure virtual returns(OptionType);
 }

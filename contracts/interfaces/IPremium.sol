@@ -2,19 +2,14 @@
 pragma solidity ^0.8.0;
 
 struct PremiumVars {
-  uint8 strikePriceGapIndex;
-  uint8 durationIndex;
-  uint16 vaultUtilization;
-  uint16 collectionUtilization;
-  uint256 price;
+  uint256 spotPrice;
+  uint256 strikePrice;
+  uint256 expiry;
   uint256 vol;
-  uint256 amount;
-  uint256 collectionDelta;
-  int256 collectionPNL;
 }
 
 interface IPremium {
-  function getCallPremium(PremiumVars memory vars) external view returns (uint256);
-  function getPutPremium(PremiumVars memory vars) external view returns (uint256);
+  function getCallPremium(uint256 spotPrice, uint256 strikePrice, uint256 expiry, uint256 vol) external view returns (uint256);
+  function getPutPremium(uint256 spotPrice, uint256 strikePrice, uint256 expiry, uint256 vol) external view returns (uint256);
   function precision() external pure returns (uint256);
 }

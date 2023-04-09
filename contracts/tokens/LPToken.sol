@@ -4,36 +4,163 @@ import {IERC20, IERC20Metadata, ERC20, ERC4626} from "@openzeppelin/contracts/to
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ILPToken} from "../interfaces/ILPToken.sol";
+import {IVault} from "../interfaces/IVault.sol";
+import {SimpleInitializable} from "../libraries/SimpleInitializable.sol";
+import {PercentageMath} from "../libraries/math/PercentageMath.sol";
 
-contract LPToken is ILPToken, ERC4626, Ownable {
+
+contract LPToken is ILPToken, ERC4626, Ownable, SimpleInitializable {
     using Math for uint256;
+    using PercentageMath for uint256;
+    mapping(address => uint256) private _lockedBalances;
+    address private _vault = address(0);
+    uint256 private _maximumVaultBalance = 0;
+    uint256 private _minimumAssetToShareRatio = 1000; // 10%
+    uint256 private constant MAXIMUM_WITHDRAW_RATIO = 5000; // 50%
     
     constructor(address assetAddress) 
-      ERC4626(IERC20(assetAddress)) ERC20("", "") Ownable()
+      ERC4626(IERC20(assetAddress)) 
+      ERC20(string(abi.encodePacked("NFTSurge " , ERC20(asset()).name(), " Liquidity Provider Token")), 
+            string(abi.encodePacked("nlp" , ERC20(asset()).symbol()))) 
+      Ownable()
     {
 
+    }
+
+    modifier onlyVault() {
+    if (msg.sender != _vault) {
+      revert OnlyVault(address(this), msg.sender, _vault);
+    }
+    _;
+  }
+
+    function initialize(address vaultAddress, uint256 maxVaultBalance) public onlyOwner initializer {
+        if(vaultAddress == address(0)){
+            revert ZeroVaultAddress(address(this));
+        }
+        _vault = vaultAddress;
+        _maximumVaultBalance = maxVaultBalance;
+        emit Initialize(vaultAddress, maxVaultBalance);
+    }
+
+    function vault() public view override returns(address) {
+        return _vault;
+    }
+
+    function maximumVaultBalance() public view override returns(uint256) {
+        return _maximumVaultBalance;
+    }
+
+    function setMaximumVaultBalance(uint256 maxVaultBalance) public override onlyOwner {
+        _maximumVaultBalance = maxVaultBalance;
+        emit UpdateMaximumVaultBalance(maxVaultBalance);
+    }
+
+    function setMinimumAssetToShareRatio(uint256 ratio) public override onlyOwner {
+        _minimumAssetToShareRatio = ratio;
+        emit UpdateMinimumAssetToShareRatio(ratio);
     }
 
     function lockedBalanceOf(address user) public override view returns(uint256) {
-        return 0;
+        return _lockedBalances[user];
     }
 
-    function mint(address onBehalfOf, uint256 amount) public override onlyOwner
-    {
-
+    function unlockBalance(address user, uint256 amount) public override onlyVault {
+        if(_lockedBalances[user] == 0) return;
+        _lockedBalances[user] -= amount;
     }
 
-    function burn(address user, address to, uint256 amount) public override onlyOwner
-    {
-
+    function totalAssets() public view override returns (uint256) {
+        IVault vaultContract = IVault(_vault);
+        int256 assets = int256(ERC4626.totalAssets() - vaultContract.unrealizedPremium()) + vaultContract.unrealizedPNL();
+        return assets > 0 ? uint256(assets) : 0;
     }
 
-    function name() public view override(IERC20Metadata, ERC20) returns (string memory) {
-      return string(abi.encodePacked("NFTSurge " , ERC20(asset()).name(), " Liquidity Provider Token"));
+
+    function maxDeposit(address) public view override returns (uint256) {
+        return _maxDeposit();
     }
 
-    function symbol() public view override(IERC20Metadata, ERC20) returns (string memory) {
-      return string(abi.encodePacked("nlp" , ERC20(asset()).symbol()));
+    function maxMint(address) public view override returns (uint256) {
+        return _convertToShares(_maxDeposit(), Math.Rounding.Down);
+    }
+
+    function _maxDeposit() internal view returns (uint256) {
+        uint256 _totalAssets = totalAssets();
+        return (_totalAssets < _maximumVaultBalance) ? (_maximumVaultBalance - _totalAssets) : 0;
+    }
+
+    function maxWithdraw(address user) public view override returns (uint256) {
+        return _maxWithdraw(user);
+    }
+
+    function _maxWithdraw(address user) internal view returns (uint256) {
+        uint256 userBalance = balanceOf(user) - lockedBalanceOf(user);
+        if(userBalance == 0) {
+            return 0;
+        }
+        userBalance = _convertToAssets(userBalance, Math.Rounding.Down);
+        return Math.min(userBalance, _maxWithdrawBalance());
+    }
+
+    function _maxRedeem(address user) internal view returns (uint256) {
+        uint256 userBalance = balanceOf(user) - lockedBalanceOf(user);
+        if(userBalance == 0) {
+            return 0;
+        }
+        return Math.min(userBalance, _convertToShares(_maxWithdrawBalance(), Math.Rounding.Down));
+    }
+
+    function _maxWithdrawBalance() internal view returns (uint256) {
+        uint256 _totalAssets = totalAssets();
+        uint256 _totalLockedAssets = IVault(_vault).totalLockedAssets();
+        return (_totalAssets > _totalLockedAssets) ? (_totalAssets - _totalLockedAssets).percentMul(MAXIMUM_WITHDRAW_RATIO) : 0;
+    }
+
+    function deposit(uint256 assets, address receiver) public override returns(uint256){
+        uint256 maximumDepositAssets = maxDeposit(receiver);
+        if(assets > maximumDepositAssets){
+            revert DepositMoreThanMax(address(this), assets, maximumDepositAssets);
+        }
+        uint256 shares = previewDeposit(assets);
+        if(shares.percentMul(_minimumAssetToShareRatio) > assets){
+            revert InsufficientAssetToShareRatio(address(this), assets, shares, _minimumAssetToShareRatio);
+        }
+        _deposit(_msgSender(), receiver, assets, shares);
+        return shares;
+    }
+
+    function mint(uint256 shares, address receiver) public override onlyVault returns(uint256) {
+        uint256 maximumMintShares = maxMint(receiver);
+        if(shares > maximumMintShares){
+            revert MintMoreThanMax(address(this), shares, maximumMintShares);
+        }
+        uint256 assets = previewMint(shares);
+        if(shares.percentMul(_minimumAssetToShareRatio) > assets){
+            revert InsufficientAssetToShareRatio(address(this), assets, shares, _minimumAssetToShareRatio);
+        }
+        _deposit(_msgSender(), receiver, assets, shares);
+        return assets;
+    }
+
+    function withdraw(uint256 shares, address receiver, address owner) public override returns(uint256){
+        uint256 maximumWithdrawShares = maxWithdraw(owner);
+        if(shares > maximumWithdrawShares){
+            revert WithdrawMoreThanMax(address(this), shares, maximumWithdrawShares);
+        }
+        uint256 assets = previewWithdraw(shares);
+        _withdraw(_msgSender(), receiver, owner, assets, shares);
+        return assets;
+    }
+
+    function redeem(uint256 shares, address receiver, address owner) public override returns(uint256) {
+        uint256 maximumRedeemShares = _maxRedeem(owner);
+        if(shares > maximumRedeemShares){
+            revert RedeemMoreThanMax(address(this), shares, maximumRedeemShares);
+        }
+        uint256 assets = previewRedeem(shares);
+        _withdraw(_msgSender(), receiver, owner, assets, shares);
+        return shares;
     }
 
     /**
@@ -82,5 +209,4 @@ contract LPToken is ILPToken, ERC4626, Ownable {
     ) internal view override returns (uint256 assets) {
         return shares;
     }
-
 }
