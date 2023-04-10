@@ -10,7 +10,6 @@ struct Strike {
     uint256 spotPrice;
     uint256 strikePrice;
     uint256 expiry;
-    uint256 premium;
 }
 
 interface IVault {

@@ -67,7 +67,7 @@ abstract contract OptionBase is IOptionBase, ERC721Enumerable, Ownable, SimpleIn
             revert ZeroAmount(address(this));
         }
         uint256 positionId = _nextId++;
-        _options[positionId] = OptionPosition(strikeId, PositionState.PENDING, amount);
+        _options[positionId] = OptionPosition(strikeId, PositionState.PENDING, amount, 0);
         if(_optionType() == OptionType.LONG_CALL) {
             _totalPendingValue += spotPrice(positionId);
         } else {
@@ -77,7 +77,7 @@ abstract contract OptionBase is IOptionBase, ERC721Enumerable, Ownable, SimpleIn
         return positionId;
     }
 
-    function activePosition(uint256 positionId) public override onlyVault
+    function activePosition(uint256 positionId, uint256 premium) public override onlyVault
     {
         OptionPosition storage po = _options[positionId];
         if(po.state != PositionState.PENDING) {
@@ -91,6 +91,7 @@ abstract contract OptionBase is IOptionBase, ERC721Enumerable, Ownable, SimpleIn
             _totalValue += strikePrice(positionId);
         }
         po.state = PositionState.ACTIVE;
+        po.premium = premium;
     }
 
     function closePosition(uint256 positionId) public override onlyVault

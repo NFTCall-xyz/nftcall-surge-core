@@ -17,6 +17,7 @@ struct OptionPosition {
     uint256 strikeId;
     PositionState state;
     uint256 amount;
+    uint256 premium;
 }
 
 interface IOptionBase {
@@ -27,7 +28,7 @@ interface IOptionBase {
     function vault() external view returns(address);
     function setBaseURI(string memory baseURI) external;
     function openPosition(address to, uint256 strikeId, uint256 amount) external returns(uint256 positionId);
-    function activePosition(uint256 positionId) external;
+    function activePosition(uint256 positionId, uint256 premium) external;
     function closePosition(uint256 positionId) external;
     function forceClosePosition(uint256 positionId) external;
     function optionPositionState(uint256 positionId) external view returns(PositionState);
