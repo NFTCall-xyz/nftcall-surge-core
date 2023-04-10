@@ -35,7 +35,6 @@ interface IOptionBase {
     function optionPosition(uint256 positionId) external view returns(OptionPosition memory);
     function strikePrice(uint256 positionId) external view returns(uint256);
     function spotPrice(uint256 positionId) external view returns(uint256);
-    function totalPendingValue() external view returns(uint256);
     function totalValue() external view returns(uint256);
 
     error OnlyVault(address thrower, address caller, address vault);

@@ -161,14 +161,16 @@ contract Vault is IVault, Pausable, Ownable{
         uint256 strikeId = _nextId++;
         _strikes[strikeId] = strike_;
         //mint callOption token
-        return (CallOptionToken(config.callToken).openPosition(onBehalfOf, strikeId, amount), premium);
+        CallOptionToken callToken = CallOptionToken(config.callToken);
+        uint256 positionId = callToken.openPosition(onBehalfOf, strikeId, amount);
+        _totalLockedAssets += callToken.spotPrice(positionId);
+        return (positionId, premium);
     }
 
     function activateCallPosition(address collection, uint256 positionId) public override onlyOwner returns(uint256 premium){
         CollectionConfiguration memory config = _collections[collection].config;
         CallOptionToken callToken = CallOptionToken(config.callToken);
         OptionPosition memory position = callToken.optionPosition(positionId);
-        _totalLockedAssets += callToken.spotPrice(positionId).mulDiv(position.amount, 10 ** _decimals, Math.Rounding.Up);
         Strike memory strike_ = _strikes[position.strikeId];
         TradeParameters memory tradeParameters;
         tradeParameters.optionType = OptionType.LONG_CALL;
@@ -201,8 +203,12 @@ contract Vault is IVault, Pausable, Ownable{
         _validateOpenOption2(config, strike_.strikePrice.mulDiv(amount, 10 ** _decimals, Math.Rounding.Up), premium);
         uint256 strikeId = _nextId++;
         _strikes[strikeId] = strike_;
+
+        PutOptionToken putToken = PutOptionToken(config.putToken);
         //mint putOption token
-        return (PutOptionToken(config.putToken).openPosition(onBehalfOf, strikeId, amount), premium);
+        uint256 positionId = putToken.openPosition(onBehalfOf, strikeId, amount);
+        _totalLockedAssets += putToken.strikePrice(positionId);
+        return (positionId, premium);
     }
 
     function activatePutPosition(address collection, uint256 positionId) public override onlyOwner returns(uint256 premium){
@@ -210,7 +216,6 @@ contract Vault is IVault, Pausable, Ownable{
         PutOptionToken putToken = PutOptionToken(config.putToken);
         
         OptionPosition memory position = putToken.optionPosition(positionId);
-        _totalLockedAssets += putToken.strikePrice(positionId).mulDiv(position.amount, 10 ** _decimals, Math.Rounding.Up);
         Strike memory strike_ = _strikes[position.strikeId];
         TradeParameters memory tradeParameters;
         tradeParameters.optionType = OptionType.LONG_PUT;
@@ -319,6 +324,20 @@ contract Vault is IVault, Pausable, Ownable{
             }
         }
         return profit;
+    }
+
+    function forceClosePendingCallPosition(address collection, uint256 positionId) public override onlyOwner {
+        CollectionConfiguration memory config = _collections[collection].config;
+        CallOptionToken callToken = CallOptionToken(config.callToken);
+        _totalLockedAssets -= callToken.spotPrice(positionId);
+        callToken.forceClosePosition(positionId);
+    }
+
+    function forceClosePendingPutPosition(address collection, uint256 positionId) public override onlyOwner {
+        CollectionConfiguration memory config = _collections[collection].config;
+        PutOptionToken putToken = PutOptionToken(config.putToken);
+        _totalLockedAssets -= putToken.strikePrice(positionId);
+        putToken.forceClosePosition(positionId);
     }
 
     /*function previewOpenCall(address collection, uint256 amount, uint256 strikePriceIdx, uint256 durationIdx) external view returns(uint256 strikePrice, uint256 premium, uint256 errorCode) {

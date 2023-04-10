@@ -25,5 +25,7 @@ interface IVault {
     function openPutPosition(address collection, address to, uint8 strikePriceIdx, uint8 durationIdx, uint256 amount) external returns(uint256 positionId, uint256 permium);
     function activatePutPosition(address collection, uint256 positionId) external returns(uint256 premium);
     function closePutPosition(address collection, address to, uint256 positionId) external returns(uint256);
+    function forceClosePendingCallPosition(address collection, uint256 positionId) external;
+    function forceClosePendingPutPosition(address collection, uint256 positionId) external;
     function strike(uint256 strikeId) external view returns(Strike memory);
 }

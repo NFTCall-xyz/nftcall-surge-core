@@ -18,7 +18,6 @@ abstract contract OptionBase is IOptionBase, ERC721Enumerable, Ownable, SimpleIn
     address private _vault;
     uint256 internal constant _decimals = 18;
     uint256 private _totalValue;
-    uint256 private _totalPendingValue;
     uint256 private _nextId = 1;
     string private _baseTokenURI;
 
@@ -69,9 +68,9 @@ abstract contract OptionBase is IOptionBase, ERC721Enumerable, Ownable, SimpleIn
         uint256 positionId = _nextId++;
         _options[positionId] = OptionPosition(strikeId, PositionState.PENDING, amount, 0);
         if(_optionType() == OptionType.LONG_CALL) {
-            _totalPendingValue += spotPrice(positionId);
+            _totalValue += spotPrice(positionId);
         } else {
-            _totalPendingValue += strikePrice(positionId);
+            _totalValue += strikePrice(positionId);
         }
         _safeMint(to, positionId);
         return positionId;
@@ -83,13 +82,6 @@ abstract contract OptionBase is IOptionBase, ERC721Enumerable, Ownable, SimpleIn
         if(po.state != PositionState.PENDING) {
             revert IsNotPending(address(this), positionId, po.state);
         }
-        if(_optionType() == OptionType.LONG_CALL) {
-            _totalPendingValue -= spotPrice(positionId);
-            _totalValue += spotPrice(positionId);
-        } else {
-            _totalPendingValue -= strikePrice(positionId);
-            _totalValue += strikePrice(positionId);
-        }
         po.state = PositionState.ACTIVE;
         po.premium = premium;
     }
@@ -99,6 +91,18 @@ abstract contract OptionBase is IOptionBase, ERC721Enumerable, Ownable, SimpleIn
         if(_options[positionId].state != PositionState.ACTIVE) {
             revert IsNotActive(address(this), positionId, _options[positionId].state);
         }
+        _closePosition(positionId);
+    }
+
+    function forceClosePosition(uint256 positionId) public override onlyVault
+    {
+        if(_options[positionId].state != PositionState.PENDING) {
+            revert IsNotPending(address(this), positionId, _options[positionId].state);
+        }
+        _closePosition(positionId);
+    }
+
+    function _closePosition(uint256 positionId) internal {
         if(_optionType() == OptionType.LONG_CALL) {
             _totalValue -= spotPrice(positionId);
         } else {
@@ -108,28 +112,9 @@ abstract contract OptionBase is IOptionBase, ERC721Enumerable, Ownable, SimpleIn
         _burn(positionId);
     }
 
-    function forceClosePosition(uint256 positionId) public override onlyVault
-    {
-        if(_options[positionId].state != PositionState.PENDING) {
-            revert IsNotPending(address(this), positionId, _options[positionId].state);
-        }
-        if(_optionType() == OptionType.LONG_CALL) {
-            _totalPendingValue -= spotPrice(positionId);
-        } else {
-            _totalPendingValue -= strikePrice(positionId);
-        }
-        delete _options[positionId];
-        _burn(positionId);
-    }
-
     function totalValue() public override view returns(uint256) 
     {
         return(_totalValue);
-    }
-
-    function totalPendingValue() public override view returns(uint256) 
-    {
-        return(_totalPendingValue);
     }
 
     function strikePrice(uint256 positionId) public view override returns(uint256) {
