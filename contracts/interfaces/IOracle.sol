@@ -30,7 +30,7 @@ interface IOracle {
 
   function getUpdateTimestampForVaultData(address vault) external view returns(uint256 timestamp);
 
-  function updateAndGetVol(address vault, address asset, TradeParameters memory tradeParams) external returns(uint256 vol);
+  function updateAndGetAdjustedVol(address vault, address asset, TradeParameters memory tradeParams) external returns(uint256 vol);
 
   function update(address vault, address asset, TradeParameters memory tradeParams) external;
 }

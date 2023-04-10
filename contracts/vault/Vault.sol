@@ -177,8 +177,8 @@ contract Vault is IVault, Pausable, Ownable{
         tradeParameters.strikePrice = strike_.strikePrice;
         tradeParameters.expiry = strike_.expiry;
         tradeParameters.amount = position.amount;
-        uint256 vol = IOracle(_oracle).updateAndGetVol(address(this), collection, tradeParameters);
-        premium = IPremium(_premium).getCallPremium(strike_.spotPrice, strike_.strikePrice, strike_.expiry, vol);
+        uint256 adjustedVol = IOracle(_oracle).updateAndGetAdjustedVol(address(this), collection, tradeParameters);
+        premium = IPremium(_premium).getCallPremium(strike_.spotPrice, strike_.strikePrice, strike_.expiry, adjustedVol);
         _unrealizedPremium += premium;
         callToken.activePosition(positionId, premium);
         //transfer premium from the caller to the vault
@@ -219,8 +219,8 @@ contract Vault is IVault, Pausable, Ownable{
         tradeParameters.strikePrice = strike_.strikePrice;
         tradeParameters.expiry = strike_.expiry;
         tradeParameters.amount = position.amount;
-        uint256 vol = IOracle(_oracle).updateAndGetVol(address(this), collection, tradeParameters);
-        premium = IPremium(_premium).getPutPremium(strike_.spotPrice, strike_.strikePrice, strike_.expiry, vol);
+        uint256 adjustedVol = IOracle(_oracle).updateAndGetAdjustedVol(address(this), collection, tradeParameters);
+        premium = IPremium(_premium).getPutPremium(strike_.spotPrice, strike_.strikePrice, strike_.expiry, adjustedVol);
         _unrealizedPremium += premium;
         //transfer premium from the caller to the vault
         uint256 amountToReserve = premium.percentMul(RESERVE_RATIO);
