@@ -7,7 +7,6 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {StorageSlot} from "@openzeppelin/contracts/utils/StorageSlot.sol";
 import {STRIKE_PRICE_GAP_LIST_SIZE, DURATION_LIST_SIZE} from "../libraries/DataTypes.sol";
-import {Errors} from "../libraries/Errors.sol";
 import {WadRayMath} from "../libraries/math/WadRayMath.sol";
 import {PercentageMath} from "../libraries/math/PercentageMath.sol";
 import {LPToken} from "../tokens/LPToken.sol";

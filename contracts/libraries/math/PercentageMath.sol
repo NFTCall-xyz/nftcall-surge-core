@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: agpl-3.0
 pragma solidity 0.8.17;
 
-import {Errors} from '../Errors.sol';
+import {MathErrors} from "./MathErrors.sol";
 
 /**
  * @title PercentageMath library
@@ -26,11 +26,9 @@ library PercentageMath {
       return 0;
     }
 
-    require(
-      value <= (type(uint256).max - HALF_PERCENT) / percentage,
-      Errors.MATH_MULTIPLICATION_OVERFLOW
-    );
-
+    if(value > (type(uint256).max - HALF_PERCENT) / percentage){
+      revert MathErrors.MultiplicationOverflow();
+    }
     return (value * percentage + HALF_PERCENT) / PERCENTAGE_FACTOR;
   }
 
@@ -41,14 +39,14 @@ library PercentageMath {
    * @return The value divided the percentage
    **/
   function percentDiv(uint256 value, uint256 percentage) internal pure returns (uint256) {
-    require(percentage != 0, Errors.MATH_DIVISION_BY_ZERO);
+    if(percentage == 0) {
+      revert MathErrors.DivisionByZero();
+    }
     uint256 halfPercentage = percentage / 2;
 
-    require(
-      value <= (type(uint256).max - halfPercentage) / PERCENTAGE_FACTOR,
-      Errors.MATH_MULTIPLICATION_OVERFLOW
-    );
-
+    if(value > (type(uint256).max - halfPercentage) / PERCENTAGE_FACTOR){
+      revert MathErrors.MultiplicationOverflow();
+    }
     return (value * PERCENTAGE_FACTOR + halfPercentage) / percentage;
   }
 }
