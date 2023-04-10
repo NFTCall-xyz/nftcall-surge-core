@@ -9,6 +9,7 @@ struct TradeParameters {
   TradeType tradeType;
   uint256 spotPrice;
   uint256 strikePrice;
+  uint256 duration;
   uint256 expiry;
   uint256 amount;
 }

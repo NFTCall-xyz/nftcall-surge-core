@@ -140,13 +140,13 @@ contract Vault is IVault, Pausable, Ownable{
     function _calculateStrikeAndPremium(address collection, OptionType optionType, uint8 strikePriceIdx, uint8 durationIdx) internal view returns(Strike memory strike_, uint256 premium){
         uint256 vol;
         (strike_.spotPrice, vol) = IOracle(_oracle).getAssetPriceAndVol(collection);
-        strike_.expiry = block.timestamp + DURATION(durationIdx);
+        strike_.duration = DURATION(durationIdx);
         if(optionType == OptionType.LONG_CALL){
             strike_.strikePrice = _callStrikePrice(strike_.spotPrice, strikePriceIdx);
-            premium = IPremium(_premium).getCallPremium(strike_.spotPrice, strike_.strikePrice, strike_.expiry, vol).percentMul(PREMIUM_UPSCALE_RATIO);
+            premium = IPremium(_premium).getCallPremium(strike_.spotPrice, strike_.strikePrice, strike_.duration, vol).percentMul(PREMIUM_UPSCALE_RATIO);
         }else{
             strike_.strikePrice = _putStrikePrice(strike_.spotPrice, strikePriceIdx);
-            premium = IPremium(_premium).getPutPremium(strike_.spotPrice, strike_.strikePrice, strike_.expiry, vol).percentMul(PREMIUM_UPSCALE_RATIO);
+            premium = IPremium(_premium).getPutPremium(strike_.spotPrice, strike_.strikePrice, strike_.duration, vol).percentMul(PREMIUM_UPSCALE_RATIO);
         }
     }
 
@@ -177,10 +177,12 @@ contract Vault is IVault, Pausable, Ownable{
         tradeParameters.optionType = OptionType.LONG_CALL;
         tradeParameters.tradeType = TradeType.OPEN;
         tradeParameters.strikePrice = strike_.strikePrice;
-        tradeParameters.expiry = strike_.expiry;
+        tradeParameters.duration = strike_.duration;
         tradeParameters.amount = position.amount;
+        strike_.expiry = block.timestamp + strike_.duration;
+        tradeParameters.expiry = strike_.expiry;
         uint256 adjustedVol = IOracle(_oracle).updateAndGetAdjustedVol(address(this), collection, tradeParameters);
-        premium = IPremium(_premium).getCallPremium(strike_.spotPrice, strike_.strikePrice, strike_.expiry, adjustedVol);
+        premium = IPremium(_premium).getCallPremium(strike_.spotPrice, strike_.strikePrice, strike_.duration, adjustedVol);
         _unrealizedPremium += premium;
         callToken.activePosition(positionId, premium);
         //transfer premium from the caller to the vault
@@ -222,10 +224,12 @@ contract Vault is IVault, Pausable, Ownable{
         tradeParameters.optionType = OptionType.LONG_PUT;
         tradeParameters.tradeType = TradeType.OPEN;
         tradeParameters.strikePrice = strike_.strikePrice;
-        tradeParameters.expiry = strike_.expiry;
+        tradeParameters.duration = strike_.duration;
         tradeParameters.amount = position.amount;
+        strike_.expiry = block.timestamp + strike_.duration;
+        tradeParameters.expiry = strike_.expiry;
         uint256 adjustedVol = IOracle(_oracle).updateAndGetAdjustedVol(address(this), collection, tradeParameters);
-        premium = IPremium(_premium).getPutPremium(strike_.spotPrice, strike_.strikePrice, strike_.expiry, adjustedVol);
+        premium = IPremium(_premium).getPutPremium(strike_.spotPrice, strike_.strikePrice, strike_.duration, adjustedVol);
         _unrealizedPremium += premium;
         //transfer premium from the caller to the vault
         uint256 amountToReserve = premium.percentMul(RESERVE_RATIO);
@@ -267,6 +271,7 @@ contract Vault is IVault, Pausable, Ownable{
         tradeParameters.tradeType = TradeType.CLOSE;
         tradeParameters.spotPrice = strike_.spotPrice;
         tradeParameters.strikePrice = strike_.strikePrice;
+        tradeParameters.duration = strike_.duration;
         tradeParameters.expiry = strike_.expiry;
         tradeParameters.amount = position.amount;
         IOracle(_oracle).update(address(this), collection, tradeParameters);
@@ -312,6 +317,7 @@ contract Vault is IVault, Pausable, Ownable{
         tradeParameters.spotPrice = strike_.spotPrice;
         tradeParameters.strikePrice = strike_.strikePrice;
         tradeParameters.expiry = strike_.expiry;
+        tradeParameters.duration = strike_.duration;
         tradeParameters.amount = position.amount;
         IOracle(_oracle).update(address(this), collection, tradeParameters);
         putToken.closePosition(positionId);

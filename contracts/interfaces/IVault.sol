@@ -9,6 +9,7 @@ enum TradeType {
 struct Strike {
     uint256 spotPrice;
     uint256 strikePrice;
+    uint256 duration;
     uint256 expiry;
 }
 
