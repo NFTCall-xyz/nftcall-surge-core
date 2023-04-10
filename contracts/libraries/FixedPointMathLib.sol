@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: ISC
-pragma solidity 0.8.16;
+pragma solidity ^0.8.17;
 
 // Slightly modified version of:
 // - https://github.com/recmo/experiment-solexp/blob/605738f3ed72d6c67a414e992be58262fbc9bb80/src/FixedPointMathLib.sol
