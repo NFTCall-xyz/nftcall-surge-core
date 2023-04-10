@@ -61,6 +61,7 @@ contract Vault is IVault, Pausable, Ownable{
     uint256 private constant RESERVE_RATIO = 1000; // 10%
     uint256 private FEE_RATIO = 125; // 1.25%
     uint256 private MAXIMUM_FEE_RATIO = 1250; // 12.5%
+    uint256 private constant PREMIUM_UPSCALE_RATIO = 15000; // 150%
     
     uint256 private constant MAXIMUM_LOCK_RATIO = 9500; // 95%
     uint256 private constant _decimals = 18;
@@ -142,10 +143,10 @@ contract Vault is IVault, Pausable, Ownable{
         strike_.expiry = block.timestamp + DURATION(durationIdx);
         if(optionType == OptionType.LONG_CALL){
             strike_.strikePrice = _callStrikePrice(strike_.spotPrice, strikePriceIdx);
-            premium = IPremium(_premium).getCallPremium(strike_.spotPrice, strike_.strikePrice, strike_.expiry, vol);
+            premium = IPremium(_premium).getCallPremium(strike_.spotPrice, strike_.strikePrice, strike_.expiry, vol).percentMul(PREMIUM_UPSCALE_RATIO);
         }else{
             strike_.strikePrice = _putStrikePrice(strike_.spotPrice, strikePriceIdx);
-            premium = IPremium(_premium).getPutPremium(strike_.spotPrice, strike_.strikePrice, strike_.expiry, vol);
+            premium = IPremium(_premium).getPutPremium(strike_.spotPrice, strike_.strikePrice, strike_.expiry, vol).percentMul(PREMIUM_UPSCALE_RATIO);
         }
     }
 
