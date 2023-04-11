@@ -6,6 +6,7 @@ import {SignedDecimalMath} from "./synthetix/SignedDecimalMath.sol";
 import {DecimalMath} from "./synthetix/DecimalMath.sol";
 import {BlackSholes} from "./libraries/BlackScholes.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 // Inherited
 import "./synthetix/Owned.sol";
@@ -26,7 +27,7 @@ import {OptionType} from "./interfaces/IOptionBase.sol";
  * @dev Logic for working out the price of an option. Includes the IV impact of the trade, the fee components and
  * premium.
  */
-contract OptionPricer is Owned, SimpleInitializable {
+contract OptionPricer is Ownable, SimpleInitializable {
   using DecimalMath for uint;
   using SignedDecimalMath for int;
   using BlackScholes for BlackScholes.BlackScholesInputs;

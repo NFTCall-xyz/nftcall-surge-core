@@ -14,6 +14,7 @@ import {TradeType, Strike, IVault} from "../interfaces/IVault.sol";
 import {OptionType, OptionPosition, PositionState, IOptionBase} from "../interfaces/IOptionBase.sol";
 import {TradeParameters, IOracle} from "../interfaces/IOracle.sol";
 import {IPremium, PremiumVars} from "../interfaces/IPremium.sol";
+import {IPricer} from "../interfaces/IPricer.sol";
 import {CallOptionToken} from "../tokens/CallOptionToken.sol";
 import {PutOptionToken} from "../tokens/PutOptionToken.sol";
 
@@ -42,7 +43,7 @@ contract Vault is IVault, Pausable, Ownable{
     address private _asset;
     address private _lpToken;
     address private _oracle;
-    address private _premium;
+    address private _pricer;
     address private _reserve;
     uint16 private _maximumCallUsage;
     uint16 private _maximumPutUsage;
@@ -138,15 +139,18 @@ contract Vault is IVault, Pausable, Ownable{
     }
 
     function _calculateStrikeAndPremium(address collection, OptionType optionType, uint8 strikePriceIdx, uint8 durationIdx) internal view returns(Strike memory strike_, uint256 premium){
-        uint256 vol;
-        (strike_.spotPrice, vol) = IOracle(_oracle).getAssetPriceAndVol(collection);
+        IPricer pricer = IPricer(_pricer);
+        strike_.spotPrice = IOracle(_oracle).getAssetPrice(collection);
         strike_.duration = DURATION(durationIdx);
+        
         if(optionType == OptionType.LONG_CALL){
             strike_.strikePrice = _callStrikePrice(strike_.spotPrice, strikePriceIdx);
-            premium = IPremium(_premium).getCallPremium(strike_.spotPrice, strike_.strikePrice, strike_.duration, vol).percentMul(PREMIUM_UPSCALE_RATIO);
+            uint256 adjustedVol = pricer.getAdjustedVol(collection, optionType, strike_.strikePrice, strike_.duration);
+            premium = pricer.getPremium(collection, strike_.spotPrice, strike_.strikePrice, adjustedVol, strike_.duration).percentMul(PREMIUM_UPSCALE_RATIO);
         }else{
             strike_.strikePrice = _putStrikePrice(strike_.spotPrice, strikePriceIdx);
-            premium = IPremium(_premium).getPutPremium(strike_.spotPrice, strike_.strikePrice, strike_.duration, vol).percentMul(PREMIUM_UPSCALE_RATIO);
+            uint256 adjustedVol = pricer.getAdjustedVol(collection, optionType, strike_.strikePrice, strike_.duration);
+            premium = pricer.getPutPremium(collection, strike_.spotPrice, strike_.strikePrice, adjustedVol, strike_.duration).percentMul(PREMIUM_UPSCALE_RATIO);
         }
     }
 
@@ -181,8 +185,10 @@ contract Vault is IVault, Pausable, Ownable{
         tradeParameters.amount = position.amount;
         strike_.expiry = block.timestamp + strike_.duration;
         tradeParameters.expiry = strike_.expiry;
-        uint256 adjustedVol = IOracle(_oracle).updateAndGetAdjustedVol(address(this), collection, tradeParameters);
-        premium = IPremium(_premium).getCallPremium(strike_.spotPrice, strike_.strikePrice, strike_.duration, adjustedVol);
+        strike_.spotPrice = IOracle(_oracle).getAssetPrice(collection);
+        IPricer pricer = IPricer(_pricer);
+        uint256 adjustedVol = pricer.getAdjustedVol(collection, OptionType.LONG_CALL, strike_.strikePrice, strike_.duration);
+        premium = pricer.getPremium(collection, strike_.spotPrice, strike_.strikePrice, adjustedVol, strike_.duration);
         _unrealizedPremium += premium;
         callToken.activePosition(positionId, premium);
         //transfer premium from the caller to the vault
@@ -227,9 +233,11 @@ contract Vault is IVault, Pausable, Ownable{
         tradeParameters.duration = strike_.duration;
         tradeParameters.amount = position.amount;
         strike_.expiry = block.timestamp + strike_.duration;
+        strike_.spotPrice = IOracle(_oracle).getAssetPrice(collection);
         tradeParameters.expiry = strike_.expiry;
-        uint256 adjustedVol = IOracle(_oracle).updateAndGetAdjustedVol(address(this), collection, tradeParameters);
-        premium = IPremium(_premium).getPutPremium(strike_.spotPrice, strike_.strikePrice, strike_.duration, adjustedVol);
+        IPricer pricer = IPricer(_pricer);
+        uint256 adjustedVol = pricer.getAdjustedVol(collection, OptionType.LONG_PUT, strike_.strikePrice, strike_.duration);
+        premium = pricer.getPremium(collection, strike_.spotPrice, strike_.strikePrice, adjustedVol, strike_.duration);
         _unrealizedPremium += premium;
         //transfer premium from the caller to the vault
         uint256 amountToReserve = premium.percentMul(RESERVE_RATIO);
@@ -355,46 +363,6 @@ contract Vault is IVault, Pausable, Ownable{
     function previewOpenPut(address collection, uint256 amount, uint256 strikePriceIdx, uint256 durationIdx) external view returns(uint256 strikePrice, uint256 premium, uint256 errorCode) {
 
     }*/
-
-    function updatePNLAndDelta() public {
-        _updatePNL();
-        _updateDelta();
-        _lastUpdateTimestamp = uint40(IOracle(_oracle).getUpdateTimestampForVaultData(address(this)));
-    }
-
-    function _updatePNL() internal {
-        int256 totalPNL = 0;
-        // update all collections' PNL
-        for(uint256 i = 0; i < _collectionsCount; i++){
-            address collection = _collectionsList[i];
-            CollectionData memory collectionData = _collections[collection];
-            // TODO should not use the Oracle, because it is not the same for all Vaults.
-            int256 newPNL = IOracle(_oracle).getPNL(address(this), collection);
-            totalPNL += newPNL;
-            _updatePNL(collection, newPNL);
-        }
-        _unrealizedPNL = totalPNL;
-    }
-
-    function _updatePNL(address collection, int256 newPNL) internal {
-        // update the new PNL
-        _collections[collection].unrealizedPNL = newPNL;
-    }
-
-    function _updateDelta() internal {
-        // update all collections' PNL
-        for(uint256 i = 0; i < _collectionsCount; i++){
-            address collection = _collectionsList[i];
-            CollectionData memory collectionData = _collections[collection];
-            // TODO should not use the Oracle, because it is not the same for all Vaults.
-            int256 newDelta = IOracle(_oracle).getDelta(address(this), collection);
-            _updateDelta(collection, newDelta);
-        }
-    }
-
-    function _updateDelta(address collection, int256 delta) internal {
-        _collections[collection].delta = delta;
-    }
 
     function _calculateExerciseCallProfit(uint256 currentPrice, uint256 strikePrice, uint256 amount) internal view returns(uint256){
         if(currentPrice <= strikePrice) {
