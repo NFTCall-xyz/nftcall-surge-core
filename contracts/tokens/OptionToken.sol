@@ -67,11 +67,7 @@ contract OptionToken is IOptionToken, ERC721Enumerable, Ownable, SimpleInitializ
         }
         uint256 positionId = _nextId++;
         _options[positionId] = OptionPosition(strikeId, PositionState.PENDING, optionType, amount, 0);
-        if(optionType == OptionType.LONG_CALL) {
-            _totalValue += spotPrice(positionId);
-        } else {
-            _totalValue += strikePrice(positionId);
-        }
+        _totalValue += lockedValue(positionId);
         _safeMint(to, positionId);
         return positionId;
     }
@@ -103,12 +99,7 @@ contract OptionToken is IOptionToken, ERC721Enumerable, Ownable, SimpleInitializ
     }
 
     function _closePosition(uint256 positionId) internal {
-        OptionType optionType = _options[positionId].optionType;
-        if(optionType == OptionType.LONG_CALL) {
-            _totalValue -= spotPrice(positionId);
-        } else {
-            _totalValue -= strikePrice(positionId);
-        }
+        _totalValue -= lockedValue(positionId);
         delete _options[positionId];
         _burn(positionId);
     }
@@ -118,14 +109,13 @@ contract OptionToken is IOptionToken, ERC721Enumerable, Ownable, SimpleInitializ
         return(_totalValue);
     }
 
-    function strikePrice(uint256 positionId) public view override returns(uint256) {
+    function lockedValue(uint256 positionId) public view override returns(uint256) {
         OptionPosition memory po = _options[positionId];
-        return IVault(_vault).strike(po.strikeId).strikePrice.mulDiv(po.amount, 10 ** _decimals, Math.Rounding.Up);
-    }
-
-    function spotPrice(uint256 positionId) public view override returns(uint256) {
-        OptionPosition memory po = _options[positionId];
-        return IVault(_vault).strike(po.strikeId).spotPrice.mulDiv(po.amount, 10 ** _decimals, Math.Rounding.Up);
+        if(po.optionType == OptionType.LONG_CALL) {
+            return IVault(_vault).strike(po.strikeId).spotPrice.mulDiv(po.amount, 10 ** _decimals, Math.Rounding.Up);
+        } else {
+            return IVault(_vault).strike(po.strikeId).strikePrice.mulDiv(po.amount, 10 ** _decimals, Math.Rounding.Up);
+        }
     }
 
     function optionPosition(uint256 positionId) public view override returns(OptionPosition memory) {

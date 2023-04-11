@@ -139,15 +139,8 @@ contract Vault is IVault, Pausable, Ownable{
         IPricer pricer = IPricer(_pricer);
         strike_.spotPrice = IOracle(_oracle).getAssetPrice(collection);
         strike_.duration = DURATION(durationIdx);
-        uint256 adjustedVol;
-        if(optionType == OptionType.LONG_CALL){
-            strike_.strikePrice = _callStrikePrice(strike_.spotPrice, strikePriceIdx);
-            adjustedVol = pricer.getAdjustedVol(collection, optionType, strike_.strikePrice, strike_.duration);
-        }else{
-            strike_.strikePrice = _putStrikePrice(strike_.spotPrice, strikePriceIdx);
-            adjustedVol = pricer.getAdjustedVol(collection, optionType, strike_.strikePrice, strike_.duration);
-
-        }
+        strike_.strikePrice = _strikePrice(optionType, strike_.spotPrice, strikePriceIdx);
+        uint256 adjustedVol = pricer.getAdjustedVol(collection, optionType, strike_.strikePrice, strike_.duration);
         premium = pricer.getPremium(collection, strike_.spotPrice, strike_.strikePrice, adjustedVol, strike_.duration).percentMul(PREMIUM_UPSCALE_RATIO);
     }
 
@@ -164,12 +157,7 @@ contract Vault is IVault, Pausable, Ownable{
         //mint option token
         OptionToken optionToken = OptionToken(config.optionToken);
         uint256 positionId = optionToken.openPosition(optionType, onBehalfOf, strikeId, amount);
-        if(optionType == OptionType.LONG_CALL){
-            _totalLockedAssets += optionToken.spotPrice(positionId);
-        }
-        else {
-            _totalLockedAssets += optionToken.strikePrice(positionId);
-        }
+        _totalLockedAssets += optionToken.lockedValue(positionId);
         return (positionId, premium);
     }
 
@@ -222,12 +210,7 @@ contract Vault is IVault, Pausable, Ownable{
             revert();
         }
 
-        if(position.optionType == OptionType.LONG_CALL){
-            _totalLockedAssets -= optionToken.spotPrice(positionId);
-        }
-        else {
-            _totalLockedAssets -= optionToken.strikePrice(positionId);
-        }
+        _totalLockedAssets -= optionToken.lockedValue(positionId);
         _unrealizedPremium -= position.premium;
         _realizedPNL += int256(position.premium);
 
@@ -258,12 +241,7 @@ contract Vault is IVault, Pausable, Ownable{
         CollectionConfiguration memory config = _collections[collection].config;
         OptionToken optionToken = OptionToken(config.optionToken);
         OptionPosition memory position = optionToken.optionPosition(positionId);
-        if(position.optionType == OptionType.LONG_CALL){
-            _totalLockedAssets -= optionToken.spotPrice(positionId);
-        }
-        else {
-            _totalLockedAssets -= optionToken.strikePrice(positionId);
-        }
+        _totalLockedAssets -= optionToken.lockedValue(positionId);
         optionToken.forceClosePosition(positionId);
     }
 
