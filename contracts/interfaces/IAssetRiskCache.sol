@@ -5,9 +5,9 @@ pragma solidity ^0.8.0;
 @title IAssetRiskCache interface
 @notice Interface for caching asset risks
 */
-interface IOracle {
+interface IAssetRiskCache {
   /***********
     @dev
      */
-  function getAssetRisk(address asset) public view returns (int delta, int PNL);
+  function getAssetRisk(address asset) external view returns (int delta, int PNL);
 }

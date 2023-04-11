@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: agpl-3.0
 pragma solidity ^0.8.0;
 
-import {OptionType} from "./IOptionBase.sol";
+import {OptionType} from "./IOptionToken.sol";
 import {TradeType} from "./IVault.sol";
 
 struct TradeParameters {
@@ -30,8 +30,4 @@ interface IOracle {
   function getDelta(address vault, address asset) external view returns(int256 delta);
 
   function getUpdateTimestampForVaultData(address vault) external view returns(uint256 timestamp);
-
-  function updateAndGetAdjustedVol(address vault, address asset, TradeParameters memory tradeParams) external returns(uint256 vol);
-
-  function update(address vault, address asset, TradeParameters memory tradeParams) external;
 }

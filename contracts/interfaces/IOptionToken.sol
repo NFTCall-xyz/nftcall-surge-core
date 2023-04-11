@@ -16,18 +16,19 @@ enum PositionState {
 struct OptionPosition {
     uint256 strikeId;
     PositionState state;
+    OptionType optionType;
     uint256 amount;
     uint256 premium;
 }
 
-interface IOptionBase {
+interface IOptionToken {
     
     event Initialize(address indexed vault);
     event UpdateBaseURI(string baseURI);
 
     function vault() external view returns(address);
     function setBaseURI(string memory baseURI) external;
-    function openPosition(address to, uint256 strikeId, uint256 amount) external returns(uint256 positionId);
+    function openPosition(OptionType optionType, address to, uint256 strikeId, uint256 amount) external returns(uint256 positionId);
     function activePosition(uint256 positionId, uint256 premium) external;
     function closePosition(uint256 positionId) external;
     function forceClosePosition(uint256 positionId) external;

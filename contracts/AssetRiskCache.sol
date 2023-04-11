@@ -1,29 +1,27 @@
 //SPDX-License-Identifier: ISC
-pragma solidity 0.8.16;
+pragma solidity 0.8.17;
 
 // Libraries
 import "./synthetix/DecimalMath.sol";
 import "./synthetix/SignedDecimalMath.sol";
 import "./libraries/BlackScholes.sol";
-import "./libraries/ConvertDecimals.sol";
 import "./libraries/Math.sol";
 
 // Inherited
-import "./synthetix/Owned.sol";
 import "./libraries/SimpleInitializable.sol";
-import "openzeppelin-contracts-4.4.1/security/ReentrancyGuard.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 // Interfaces
 // import "./BaseExchangeAdapter.sol";
-import "./OptionMarket.sol";
-import "./OptionMarketPricer.sol";
+import "./OptionPricer.sol";
 
 /**
  * @title RiskCache
  * @author NFTCall
  * @dev Update Delta and PNL for every collection
  */
-contract AssetRiskCache is Owned, SimpleInitializable, ReentrancyGuard {
+contract AssetRiskCache is Ownable, SimpleInitializable, ReentrancyGuard {
   using DecimalMath for uint;
   using SignedDecimalMath for int;
   using BlackScholes for BlackScholes.BlackScholesInputs;
@@ -41,13 +39,17 @@ contract AssetRiskCache is Owned, SimpleInitializable, ReentrancyGuard {
   
 
   function getAssetRisk(address asset) public view returns (int delta, int PNL) {
-    (delta, PNL) = assetRisks[asset];
+    return (assetRisks[asset].delta, assetRisks[asset].PNL);
   }
 
-  function updateAssetRisk(address asset, int delta, int PNL) external onlyUpdater {
+  function getRiskDecimals() public pure returns (uint) {
+    return riskDecimals;
+  }
+
+  /*function updateAssetRisk(address asset, int delta, int PNL) external onlyUpdater {
     AssetRisk storage ar = assetRisks[asset];
     ar = AssetRisk(delta, PNL);
-  }
+  }*/
 
 
 
