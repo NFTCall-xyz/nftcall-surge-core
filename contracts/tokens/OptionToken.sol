@@ -7,10 +7,10 @@ import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {IVault} from "../interfaces/IVault.sol";
-import {OptionType, PositionState, OptionPosition, IOptionBase} from "../interfaces/IOptionBase.sol";
+import {OptionType, PositionState, OptionPosition, IOptionToken} from "../interfaces/IOptionToken.sol";
 import {SimpleInitializable} from "../libraries/SimpleInitializable.sol";
 
-abstract contract OptionBase is IOptionBase, ERC721Enumerable, Ownable, SimpleInitializable {
+contract OptionToken is IOptionToken, ERC721Enumerable, Ownable, SimpleInitializable {
     using Strings for uint256;
     using Math for uint256;
 
@@ -60,14 +60,14 @@ abstract contract OptionBase is IOptionBase, ERC721Enumerable, Ownable, SimpleIn
         emit UpdateBaseURI(baseURI);
     }
 
-    function openPosition(address to, uint256 strikeId, uint256 amount) public override onlyVault returns(uint256)
+    function openPosition(OptionType optionType, address to, uint256 strikeId, uint256 amount) public override onlyVault returns(uint256)
     {
         if(amount == 0) {
             revert ZeroAmount(address(this));
         }
         uint256 positionId = _nextId++;
-        _options[positionId] = OptionPosition(strikeId, PositionState.PENDING, amount, 0);
-        if(_optionType() == OptionType.LONG_CALL) {
+        _options[positionId] = OptionPosition(strikeId, PositionState.PENDING, optionType, amount, 0);
+        if(optionType == OptionType.LONG_CALL) {
             _totalValue += spotPrice(positionId);
         } else {
             _totalValue += strikePrice(positionId);
@@ -103,7 +103,8 @@ abstract contract OptionBase is IOptionBase, ERC721Enumerable, Ownable, SimpleIn
     }
 
     function _closePosition(uint256 positionId) internal {
-        if(_optionType() == OptionType.LONG_CALL) {
+        OptionType optionType = _options[positionId].optionType;
+        if(optionType == OptionType.LONG_CALL) {
             _totalValue -= spotPrice(positionId);
         } else {
             _totalValue -= strikePrice(positionId);
@@ -134,6 +135,4 @@ abstract contract OptionBase is IOptionBase, ERC721Enumerable, Ownable, SimpleIn
     function optionPositionState(uint256 positionId) public view override returns(PositionState) {
         return _options[positionId].state;
     }
-
-    function _optionType() internal pure virtual returns(OptionType);
 }

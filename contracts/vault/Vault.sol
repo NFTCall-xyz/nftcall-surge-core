@@ -11,13 +11,11 @@ import {WadRayMath} from "../libraries/math/WadRayMath.sol";
 import {PercentageMath} from "../libraries/math/PercentageMath.sol";
 import {LPToken} from "../tokens/LPToken.sol";
 import {TradeType, Strike, IVault} from "../interfaces/IVault.sol";
-import {OptionType, OptionPosition, PositionState, IOptionBase} from "../interfaces/IOptionBase.sol";
+import {OptionType, OptionPosition, PositionState, IOptionToken} from "../interfaces/IOptionToken.sol";
 import {TradeParameters, IOracle} from "../interfaces/IOracle.sol";
 import {IPremium, PremiumVars} from "../interfaces/IPremium.sol";
 import {IPricer} from "../interfaces/IPricer.sol";
-import {CallOptionToken} from "../tokens/CallOptionToken.sol";
-import {PutOptionToken} from "../tokens/PutOptionToken.sol";
-
+import {OptionToken} from "../tokens/OptionToken.sol";
 
 contract Vault is IVault, Pausable, Ownable{
     using StorageSlot for bytes32;
@@ -29,8 +27,7 @@ contract Vault is IVault, Pausable, Ownable{
         bool paused;
         bool activated;
         uint16 weight; // percentage: 10000 means 100%
-        address callToken;
-        address putToken;
+        address optionToken;
     }
 
     struct CollectionData {
@@ -126,7 +123,7 @@ contract Vault is IVault, Pausable, Ownable{
     function _validateOpenOption2(CollectionConfiguration memory collection, uint256 valueToBeLocked, uint256 premium) internal view
     {
         uint256 currentAmount = IERC20(_asset).balanceOf(_lpToken) + premium;
-        if(_totalValue(collection) + valueToBeLocked > currentAmount.percentMul(collection.weight)){
+        if(OptionToken(collection.optionToken).totalValue() + valueToBeLocked > currentAmount.percentMul(collection.weight)){
             revert();
         }
         if(_totalLockedAssets + valueToBeLocked > currentAmount.percentMul(MAXIMUM_LOCK_RATIO)){
@@ -142,43 +139,47 @@ contract Vault is IVault, Pausable, Ownable{
         IPricer pricer = IPricer(_pricer);
         strike_.spotPrice = IOracle(_oracle).getAssetPrice(collection);
         strike_.duration = DURATION(durationIdx);
-        
+        uint256 adjustedVol;
         if(optionType == OptionType.LONG_CALL){
             strike_.strikePrice = _callStrikePrice(strike_.spotPrice, strikePriceIdx);
-            uint256 adjustedVol = pricer.getAdjustedVol(collection, optionType, strike_.strikePrice, strike_.duration);
-            premium = pricer.getPremium(collection, strike_.spotPrice, strike_.strikePrice, adjustedVol, strike_.duration).percentMul(PREMIUM_UPSCALE_RATIO);
+            adjustedVol = pricer.getAdjustedVol(collection, optionType, strike_.strikePrice, strike_.duration);
         }else{
             strike_.strikePrice = _putStrikePrice(strike_.spotPrice, strikePriceIdx);
-            uint256 adjustedVol = pricer.getAdjustedVol(collection, optionType, strike_.strikePrice, strike_.duration);
-            premium = pricer.getPutPremium(collection, strike_.spotPrice, strike_.strikePrice, adjustedVol, strike_.duration).percentMul(PREMIUM_UPSCALE_RATIO);
+            adjustedVol = pricer.getAdjustedVol(collection, optionType, strike_.strikePrice, strike_.duration);
+
         }
+        premium = pricer.getPremium(collection, strike_.spotPrice, strike_.strikePrice, adjustedVol, strike_.duration).percentMul(PREMIUM_UPSCALE_RATIO);
     }
 
     //for options
-    function openCallPosition(address collection, address onBehalfOf, uint8 strikePriceIdx, uint8 durationIdx, uint256 amount) public override 
+    function openPosition(address collection, address onBehalfOf, OptionType optionType, uint8 strikePriceIdx, uint8 durationIdx, uint256 amount) public override 
         returns(uint256, uint256)
     {
-        CollectionData memory data = _collections[collection];
-        CollectionConfiguration memory config = data.config;
+        CollectionConfiguration memory config = _collections[collection].config;
         _validateOpenOption1(amount, strikePriceIdx, durationIdx);
-        (Strike memory strike_, uint256 premium) = _calculateStrikeAndPremium(collection, OptionType.LONG_CALL, strikePriceIdx, durationIdx);
+        (Strike memory strike_, uint256 premium) = _calculateStrikeAndPremium(collection, optionType, strikePriceIdx, durationIdx);
         _validateOpenOption2(config, strike_.spotPrice.mulDiv(amount, 10 ** _decimals, Math.Rounding.Up), premium);
         uint256 strikeId = _nextId++;
         _strikes[strikeId] = strike_;
-        //mint callOption token
-        CallOptionToken callToken = CallOptionToken(config.callToken);
-        uint256 positionId = callToken.openPosition(onBehalfOf, strikeId, amount);
-        _totalLockedAssets += callToken.spotPrice(positionId);
+        //mint option token
+        OptionToken optionToken = OptionToken(config.optionToken);
+        uint256 positionId = optionToken.openPosition(optionType, onBehalfOf, strikeId, amount);
+        if(optionType == OptionType.LONG_CALL){
+            _totalLockedAssets += optionToken.spotPrice(positionId);
+        }
+        else {
+            _totalLockedAssets += optionToken.strikePrice(positionId);
+        }
         return (positionId, premium);
     }
 
-    function activateCallPosition(address collection, uint256 positionId) public override onlyOwner returns(uint256 premium){
+    function activatePosition(address collection, uint256 positionId) public override onlyOwner returns(uint256 premium){
         CollectionConfiguration memory config = _collections[collection].config;
-        CallOptionToken callToken = CallOptionToken(config.callToken);
-        OptionPosition memory position = callToken.optionPosition(positionId);
+        OptionToken optionToken = OptionToken(config.optionToken);
+        OptionPosition memory position = optionToken.optionPosition(positionId);
         Strike memory strike_ = _strikes[position.strikeId];
         TradeParameters memory tradeParameters;
-        tradeParameters.optionType = OptionType.LONG_CALL;
+        tradeParameters.optionType = position.optionType;
         tradeParameters.tradeType = TradeType.OPEN;
         tradeParameters.strikePrice = strike_.strikePrice;
         tradeParameters.duration = strike_.duration;
@@ -187,10 +188,10 @@ contract Vault is IVault, Pausable, Ownable{
         tradeParameters.expiry = strike_.expiry;
         strike_.spotPrice = IOracle(_oracle).getAssetPrice(collection);
         IPricer pricer = IPricer(_pricer);
-        uint256 adjustedVol = pricer.getAdjustedVol(collection, OptionType.LONG_CALL, strike_.strikePrice, strike_.duration);
+        uint256 adjustedVol = pricer.getAdjustedVol(collection, position.optionType, strike_.strikePrice, strike_.duration);
         premium = pricer.getPremium(collection, strike_.spotPrice, strike_.strikePrice, adjustedVol, strike_.duration);
         _unrealizedPremium += premium;
-        callToken.activePosition(positionId, premium);
+        optionToken.activePosition(positionId, premium);
         //transfer premium from the caller to the vault
         uint256 amountToReserve = premium.percentMul(RESERVE_RATIO);
         _strikes[position.strikeId] = strike_;
@@ -202,66 +203,17 @@ contract Vault is IVault, Pausable, Ownable{
         }
     }
 
-    function openPutPosition(address collection, address onBehalfOf, uint8 strikePriceIdx, uint8 durationIdx, uint256 amount) public override 
-        returns(uint256, uint256)
-    {
-        CollectionData memory data = _collections[collection];
-        CollectionConfiguration memory config = data.config;
-        _validateOpenOption1(amount, strikePriceIdx, durationIdx);
-        (Strike memory strike_, uint256 premium) = _calculateStrikeAndPremium(collection, OptionType.LONG_PUT, strikePriceIdx, durationIdx);
-        _validateOpenOption2(config, strike_.strikePrice.mulDiv(amount, 10 ** _decimals, Math.Rounding.Up), premium);
-        uint256 strikeId = _nextId++;
-        _strikes[strikeId] = strike_;
-
-        PutOptionToken putToken = PutOptionToken(config.putToken);
-        //mint putOption token
-        uint256 positionId = putToken.openPosition(onBehalfOf, strikeId, amount);
-        _totalLockedAssets += putToken.strikePrice(positionId);
-        return (positionId, premium);
-    }
-
-    function activatePutPosition(address collection, uint256 positionId) public override onlyOwner returns(uint256 premium){
-        CollectionConfiguration memory config = _collections[collection].config;
-        PutOptionToken putToken = PutOptionToken(config.putToken);
-        
-        OptionPosition memory position = putToken.optionPosition(positionId);
-        Strike memory strike_ = _strikes[position.strikeId];
-        TradeParameters memory tradeParameters;
-        tradeParameters.optionType = OptionType.LONG_PUT;
-        tradeParameters.tradeType = TradeType.OPEN;
-        tradeParameters.strikePrice = strike_.strikePrice;
-        tradeParameters.duration = strike_.duration;
-        tradeParameters.amount = position.amount;
-        strike_.expiry = block.timestamp + strike_.duration;
-        strike_.spotPrice = IOracle(_oracle).getAssetPrice(collection);
-        tradeParameters.expiry = strike_.expiry;
-        IPricer pricer = IPricer(_pricer);
-        uint256 adjustedVol = pricer.getAdjustedVol(collection, OptionType.LONG_PUT, strike_.strikePrice, strike_.duration);
-        premium = pricer.getPremium(collection, strike_.spotPrice, strike_.strikePrice, adjustedVol, strike_.duration);
-        _unrealizedPremium += premium;
-        //transfer premium from the caller to the vault
-        uint256 amountToReserve = premium.percentMul(RESERVE_RATIO);
-        _strikes[position.strikeId] = strike_;
-        putToken.activePosition(positionId, premium);
-        if(!IERC20(_asset).transferFrom(msg.sender, _reserve, amountToReserve)){
-            revert();
-        }
-        if(!IERC20(_asset).transferFrom(msg.sender, _lpToken, premium - amountToReserve)){
-            revert();
-        }
-    }
-
-    function closeCallPosition(address collection, address to, uint256 positionId) public override onlyOwner returns(uint256 profit){
+    function closePosition(address collection, address to, uint256 positionId) public override onlyOwner returns(uint256 profit){
         //calculate fee
         //burn callOption token
         //transfer revenue from the vault to caller
         CollectionConfiguration memory config = _collections[collection].config;
-        CallOptionToken callToken = CallOptionToken(config.callToken);
-        OptionPosition memory position = callToken.optionPosition(positionId);
+        OptionToken optionToken = OptionToken(config.optionToken);
+        OptionPosition memory position = optionToken.optionPosition(positionId);
+        
         // pending position
         if(position.state != PositionState.ACTIVE){
-            callToken.forceClosePosition(positionId);
-            return 0;
+            revert();
         }
 
         Strike memory strike_ = _strikes[position.strikeId];
@@ -269,24 +221,30 @@ contract Vault is IVault, Pausable, Ownable{
         if(block.timestamp < strike_.expiry){
             revert();
         }
-        _totalLockedAssets -= callToken.spotPrice(positionId);
+
+        if(position.optionType == OptionType.LONG_CALL){
+            _totalLockedAssets -= optionToken.spotPrice(positionId);
+        }
+        else {
+            _totalLockedAssets -= optionToken.strikePrice(positionId);
+        }
         _unrealizedPremium -= position.premium;
         _realizedPNL += int256(position.premium);
 
         uint256 currentPrice = IOracle(_oracle).getAssetPrice(collection);
         TradeParameters memory tradeParameters;
-        tradeParameters.optionType = OptionType.LONG_PUT;
+        tradeParameters.optionType = position.optionType;
         tradeParameters.tradeType = TradeType.CLOSE;
         tradeParameters.spotPrice = strike_.spotPrice;
         tradeParameters.strikePrice = strike_.strikePrice;
         tradeParameters.duration = strike_.duration;
         tradeParameters.expiry = strike_.expiry;
         tradeParameters.amount = position.amount;
-        IOracle(_oracle).update(address(this), collection, tradeParameters);
-        callToken.closePosition(positionId);
+        // IOracle(_oracle).update(address(this), collection, tradeParameters);
+        optionToken.closePosition(positionId);
         delete _strikes[position.strikeId];
 
-        profit = _calculateExerciseCallProfit(currentPrice, strike_.strikePrice, position.amount);
+        profit = _calculateExerciseProfit(position.optionType, currentPrice, strike_.strikePrice, position.amount);
         if(profit != 0){
             _realizedPNL -= int256(profit);
             if(!IERC20(_asset).transfer(to, profit)){
@@ -296,110 +254,40 @@ contract Vault is IVault, Pausable, Ownable{
         return profit;
     }
 
-    function closePutPosition(address collection, address to, uint256 positionId) public override onlyOwner returns(uint256 profit){
-        //calculate fee
-        //burn putOption token
-        //transfer revenue from the vault to caller
+    function forceClosePendingPosition(address collection, uint256 positionId) public override onlyOwner {
         CollectionConfiguration memory config = _collections[collection].config;
-        PutOptionToken putToken = PutOptionToken(config.putToken);
-        OptionPosition memory position = putToken.optionPosition(positionId);
-        // pending position
-        if(position.state != PositionState.ACTIVE){
-            putToken.forceClosePosition(positionId);
-            return 0;
+        OptionToken optionToken = OptionToken(config.optionToken);
+        OptionPosition memory position = optionToken.optionPosition(positionId);
+        if(position.optionType == OptionType.LONG_CALL){
+            _totalLockedAssets -= optionToken.spotPrice(positionId);
         }
-
-        Strike memory strike_ = _strikes[position.strikeId];
-        
-        if(block.timestamp < strike_.expiry){
-            revert();
+        else {
+            _totalLockedAssets -= optionToken.strikePrice(positionId);
         }
-        _totalLockedAssets -= putToken.strikePrice(positionId).mulDiv(position.amount, 10 ** _decimals, Math.Rounding.Up);
-        _unrealizedPremium -= position.premium;
-        _realizedPNL += int256(position.premium);
+        optionToken.forceClosePosition(positionId);
+    }
 
-        uint256 currentPrice = IOracle(_oracle).getAssetPrice(collection);
-        TradeParameters memory tradeParameters;
-        tradeParameters.optionType = OptionType.LONG_PUT;
-        tradeParameters.tradeType = TradeType.CLOSE;
-        tradeParameters.spotPrice = strike_.spotPrice;
-        tradeParameters.strikePrice = strike_.strikePrice;
-        tradeParameters.expiry = strike_.expiry;
-        tradeParameters.duration = strike_.duration;
-        tradeParameters.amount = position.amount;
-        IOracle(_oracle).update(address(this), collection, tradeParameters);
-        putToken.closePosition(positionId);
-        delete _strikes[position.strikeId];
-
-        profit = _calculateExercisePutProfit(currentPrice, strike_.strikePrice, position.amount);
-        if(profit != 0){
-            _realizedPNL -= int256(profit);
-            if(!IERC20(_asset).transfer(to, profit)){
-                revert();
+    function _calculateExerciseProfit(OptionType optionType, uint256 currentPrice, uint256 strikePrice, uint256 amount) internal view returns(uint256){
+        uint256 profit;
+        if(optionType == OptionType.LONG_CALL){
+            if(currentPrice <= strikePrice){
+                return 0;
             }
+            profit = currentPrice - strikePrice;
+            if(profit > strikePrice){
+                profit = strikePrice;
+            }
+            profit = profit.mulDiv(amount, 10 ** _decimals, Math.Rounding.Down);
         }
-        return profit;
-    }
-
-    function forceClosePendingCallPosition(address collection, uint256 positionId) public override onlyOwner {
-        CollectionConfiguration memory config = _collections[collection].config;
-        CallOptionToken callToken = CallOptionToken(config.callToken);
-        _totalLockedAssets -= callToken.spotPrice(positionId);
-        callToken.forceClosePosition(positionId);
-    }
-
-    function forceClosePendingPutPosition(address collection, uint256 positionId) public override onlyOwner {
-        CollectionConfiguration memory config = _collections[collection].config;
-        PutOptionToken putToken = PutOptionToken(config.putToken);
-        _totalLockedAssets -= putToken.strikePrice(positionId);
-        putToken.forceClosePosition(positionId);
-    }
-
-    /*function previewOpenCall(address collection, uint256 amount, uint256 strikePriceIdx, uint256 durationIdx) external view returns(uint256 strikePrice, uint256 premium, uint256 errorCode) {
-
-
-    }
-
-    function previewOpenPut(address collection, uint256 amount, uint256 strikePriceIdx, uint256 durationIdx) external view returns(uint256 strikePrice, uint256 premium, uint256 errorCode) {
-
-    }*/
-
-    function _calculateExerciseCallProfit(uint256 currentPrice, uint256 strikePrice, uint256 amount) internal view returns(uint256){
-        if(currentPrice <= strikePrice) {
-            return 0;
+        else{
+            if(currentPrice >= strikePrice) {
+                return 0;
+            }
+            profit = (strikePrice - currentPrice).mulDiv(amount, 10 ** _decimals, Math.Rounding.Down);
         }
-        uint256 profit = currentPrice - strikePrice;
-        if(profit > strikePrice){
-            profit = strikePrice;
-        }
-        profit = profit.mulDiv(amount, 10 ** _decimals, Math.Rounding.Down);
         uint256 fee = currentPrice.mulDiv(amount, 10 ** _decimals, Math.Rounding.Down).percentMul(FEE_RATIO);
         uint256 maximumFee = profit.percentMul(MAXIMUM_FEE_RATIO);
-        if(fee > maximumFee){
-            return profit - maximumFee;
-        }
-        else {
-            return profit - fee;
-        }
-    }
-
-    function _calculateExercisePutProfit(uint256 currentPrice, uint256 strikePrice, uint256 amount) internal view returns(uint256){
-        if(currentPrice >= strikePrice) {
-            return 0;
-        }
-        uint256 profit = (strikePrice - currentPrice).mulDiv(amount, 10 ** _decimals, Math.Rounding.Down);
-        uint256 fee = currentPrice.mulDiv(amount, 10**_decimals, Math.Rounding.Down).percentMul(FEE_RATIO);
-        uint256 maximumFee = profit.percentMul(MAXIMUM_FEE_RATIO);
-        if(fee > maximumFee){
-            return profit - maximumFee;
-        }
-        else {
-            return profit - fee;
-        }
-    }
-
-    function _totalValue(CollectionConfiguration memory collectionData) internal view returns(uint256){
-        return CallOptionToken(collectionData.callToken).totalValue()  + PutOptionToken(collectionData.putToken).totalValue();
+        return profit - Math.min(fee, maximumFee);
     }
 
     function _callStrikePrice(uint256 currentPrice, uint8 strikePriceGapIndex) internal pure returns(uint256){

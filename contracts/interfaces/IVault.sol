@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
+import {OptionType} from "./IOptionToken.sol";
 
 enum TradeType {
     OPEN,
@@ -20,13 +21,9 @@ interface IVault {
     function withdraw(uint256 amount, address to) external returns(uint256);
     function totalAssets() external view returns(uint256);
     function totalLockedAssets() external view returns(uint256);
-    function openCallPosition(address collection, address onBehalfOf, uint8 strikePriceIdx, uint8 durationIdx, uint256 amount) external returns(uint256 positionId, uint256 premium);
-    function activateCallPosition(address collection, uint256 positionId) external returns(uint256 premium);
-    function closeCallPosition(address collection, address to, uint256 positionId) external returns(uint256);
-    function openPutPosition(address collection, address to, uint8 strikePriceIdx, uint8 durationIdx, uint256 amount) external returns(uint256 positionId, uint256 permium);
-    function activatePutPosition(address collection, uint256 positionId) external returns(uint256 premium);
-    function closePutPosition(address collection, address to, uint256 positionId) external returns(uint256);
-    function forceClosePendingCallPosition(address collection, uint256 positionId) external;
-    function forceClosePendingPutPosition(address collection, uint256 positionId) external;
+    function openPosition(address collection, address onBehalfOf, OptionType optionType, uint8 strikePriceIdx, uint8 durationIdx, uint256 amount) external returns(uint256 positionId, uint256 premium);
+    function activatePosition(address collection, uint256 positionId) external returns(uint256 premium);
+    function closePosition(address collection, address to, uint256 positionId) external returns(uint256);
+    function forceClosePendingPosition(address collection, uint256 positionId) external;
     function strike(uint256 strikeId) external view returns(Strike memory);
 }
