@@ -58,7 +58,7 @@ contract Vault is IVault, Pausable, Ownable{
     uint256 public constant MINIMUM_DURATION = 3 days;
     uint256 public constant MAXIMUM_DURATION = 28 days;
 
-    constructor (address asset, address lpToken, address oracle, address pricer, address riskCache, address reserve)
+    constructor (address asset, address lpToken, address oracle, address pricer, address riskCache, address reserve_)
         Ownable()
     {
         _asset = asset;
@@ -66,7 +66,7 @@ contract Vault is IVault, Pausable, Ownable{
         _oracle = oracle;
         _pricer = pricer;
         _riskCache = riskCache;
-        _reserve = reserve;
+        _reserve = reserve_;
     }
 
     function reserve() public override view returns(address) {

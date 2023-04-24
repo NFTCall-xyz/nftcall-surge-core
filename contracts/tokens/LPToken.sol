@@ -14,12 +14,18 @@ contract LPToken is ILPToken, ERC4626, Ownable, SimpleInitializable {
     using Math for uint256;
     using PercentageMath for uint256;
     using SafeERC20 for IERC20;
-    mapping(address => uint256) private _lockedBalances;
+    struct UserLockedBalanceData {
+        uint256 lockedBalance;
+        uint256 releaseTime;
+    }
+    mapping(address => UserLockedBalanceData) private _lockedBalances;
     address private _vault = address(0);
     uint256 private _maximumVaultBalance = 0;
     uint256 private _minimumAssetToShareRatio = PERCENTAGE_FACTOR * 10 / 100; // 10%
+    uint256 private _totalLockedBalance = 0;
     uint256 public constant MAXIMUM_WITHDRAW_RATIO = PERCENTAGE_FACTOR * 50 / 100; // 50%
     uint256 public constant WITHDRAW_FEE_RATIO = PERCENTAGE_FACTOR * 3 / 1000; // 0.3%
+    uint256 public constant LOCK_PERIOD = 3 days;
     
     constructor(address assetAddress) 
       ERC4626(IERC20(assetAddress)) 
@@ -66,19 +72,33 @@ contract LPToken is ILPToken, ERC4626, Ownable, SimpleInitializable {
     }
 
     function lockedBalanceOf(address user) public override view returns(uint256) {
-        return _lockedBalances[user];
+        return _lockedBalances[user].lockedBalance;
     }
 
-    function unlockBalance(address user, uint256 amount) public override onlyVault {
-        if(_lockedBalances[user] == 0) return;
-        _lockedBalances[user] -= amount;
-        emit UnlockBalance(user, amount);
+    function releaseTime(address user) public override view returns(uint256) {
+        return _lockedBalances[user].releaseTime;
+    }
+
+    function claim(address user) public override returns(uint256 shares) {
+        if(block.timestamp < _lockedBalances[user].releaseTime){
+            revert ClaimBeforeTheReleaseTime(address(this), user, _lockedBalances[user].releaseTime, block.timestamp);
+        }
+        shares = _lockedBalances[user].lockedBalance;
+        if(shares > 0){
+            _mint(user, shares);
+            _totalLockedBalance -= shares;
+            emit Claim(user, shares);
+        }
     }
 
     function totalAssets() public view override returns (uint256) {
         IVault vaultContract = IVault(_vault);
         int256 assets = int256(super.totalAssets() - vaultContract.unrealizedPremium()) + vaultContract.unrealizedPNL();
         return assets > 0 ? uint256(assets) : 0;
+    }
+
+    function totalSupply() public view override(ERC20, IERC20) returns (uint256) {
+        return super.totalSupply() + _totalLockedBalance;
     }
 
 
@@ -100,7 +120,7 @@ contract LPToken is ILPToken, ERC4626, Ownable, SimpleInitializable {
     }
 
     function _maxWithdraw(address user) internal view returns (uint256) {
-        uint256 userBalance = balanceOf(user) - lockedBalanceOf(user);
+        uint256 userBalance = balanceOf(user);
         if(userBalance == 0) {
             return 0;
         }
@@ -109,7 +129,7 @@ contract LPToken is ILPToken, ERC4626, Ownable, SimpleInitializable {
     }
 
     function _maxRedeem(address user) internal view returns (uint256) {
-        uint256 userBalance = balanceOf(user) - lockedBalanceOf(user);
+        uint256 userBalance = balanceOf(user);
         if(userBalance == 0) {
             return 0;
         }
@@ -131,7 +151,7 @@ contract LPToken is ILPToken, ERC4626, Ownable, SimpleInitializable {
         if(shares.percentMul(_minimumAssetToShareRatio) > assets){
             revert InsufficientAssetToShareRatio(address(this), assets, shares, _minimumAssetToShareRatio);
         }
-        _deposit(_msgSender(), receiver, assets, shares);
+        _deposit(_msgSender(), address(this), assets, shares);
         return shares;
     }
 
@@ -179,6 +199,31 @@ contract LPToken is ILPToken, ERC4626, Ownable, SimpleInitializable {
         uint256 assets = previewRedeem(shares);
         _withdraw(_msgSender(), receiver, owner, assets, shares);
         return shares;
+    }
+
+    /**
+     * @dev Deposit/mint common workflow.
+     */
+    function _deposit(
+        address caller,
+        address receiver,
+        uint256 assets,
+        uint256 shares
+    ) internal virtual override {
+        // If _asset is ERC777, `transferFrom` can trigger a reenterancy BEFORE the transfer happens through the
+        // `tokensToSend` hook. On the other hand, the `tokenReceived` hook, that is triggered after the transfer,
+        // calls the vault, which is assumed not malicious.
+        //
+        // Conclusion: we need to do the transfer before we mint so that any reentrancy would happen before the
+        // assets are transferred and before the shares are minted, which is a valid state.
+        // slither-disable-next-line reentrancy-no-eth
+        SafeERC20.safeTransferFrom(IERC20(asset()), caller, address(this), assets);
+        _lockedBalances[receiver].lockedBalance += shares;
+        _totalLockedBalance +=  shares;
+        _lockedBalances[receiver].releaseTime = block.timestamp + LOCK_PERIOD;
+        // _mint(receiver, shares);
+
+        emit Deposit(caller, receiver, assets, shares);
     }
 
     function _withdraw(

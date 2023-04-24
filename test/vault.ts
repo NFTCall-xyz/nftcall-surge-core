@@ -1,5 +1,6 @@
 import { expect } from 'chai';
 import { ethers } from 'ethers';
+import { time } from '@nomicfoundation/hardhat-network-helpers'
 import { makeSuite } from './make-suite';
 import { bigNumber } from '../scripts/utils';
 import { waitTx } from '../scripts/utils/contracts';
@@ -18,7 +19,7 @@ makeSuite('Vault', (testEnv) => {
     await dai.mint(amount);
     await dai.approve(lpToken.address, amount);
     await vault.deposit(amount, deployer.address);
-    const balance = await lpToken.balanceOf(deployer.address);
+    const balance = await lpToken.lockedBalanceOf(deployer.address);
     expect(balance).to.be.equal(amount);
   });
 
@@ -33,6 +34,9 @@ makeSuite('Vault', (testEnv) => {
     await dai.approve(lpToken.address, amount);
     await vault.deposit(amount, deployer.address);
     await lpToken.approve(vault.address, amount);
+    const releaseTime = await lpToken.releaseTime(deployer.address);
+    await time.increaseTo(releaseTime.toNumber() + 1);
+    await lpToken.claim(deployer.address);
     await vault.withdraw(amount, deployer.address);
     const balance = await dai.balanceOf(deployer.address);
     expect(balance).to.be.equal(amount.sub(fee));
