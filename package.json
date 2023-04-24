@@ -1,6 +1,13 @@
 {
+  "type": "commonjs",
   "dependencies": {
     "hardhat": "^2.13.0"
+  },
+  "scripts": {
+    "compile": "SKIP_LOAD=true hardhat compile",
+    "hardhat:localhost": "hardhat --network localhost",
+    "ncsurge:dev:localhost": "yarn run compile && yarn run hardhat:localhost -- dev:full",
+    "test": "yarn run compile && hardhat test"
   },
   "devDependencies": {
     "@ethersproject/abi": "^5.4.7",
@@ -19,6 +26,7 @@
     "chai": "^4.2.0",
     "ethers": "^5.4.7",
     "hardhat-gas-reporter": "^1.0.8",
+    "lowdb": "1.0.0",
     "solidity-coverage": "^0.8.0",
     "ts-node": ">=8.0.0",
     "typechain": "^8.1.0",

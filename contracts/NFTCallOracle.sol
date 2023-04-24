@@ -1,15 +1,16 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.17;
+pragma solidity ^0.8.17;
 
 import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "./interfaces/IOracleGetter.sol";
+import "./interfaces/IOracle.sol";
+
 
 /**
  * @title NFTCallOracle
  * @author NFTCall
  */
-contract NFTCallOracle is IOracleGetter, Ownable, Pausable {
+contract NFTCallOracle is IOracle, Ownable, Pausable {
     // asset address
     mapping(address => uint256) private _addressIndexes;
     mapping(address => bool) private _emergencyAdmin;
@@ -179,6 +180,10 @@ contract NFTCallOracle is IOracleGetter, Ownable, Pausable {
         (uint16 p, uint16 v) = _getPriceByIndex(asset);
         price = uint256(p) * 1e16;
         vol = uint256(v) * 10;
+    }
+
+    function getAssetPriceAndVol(address asset) external view returns (uint256 price, uint256 vol) {
+        (price, vol) = _getAsset(asset);
     }
 
     function getAssetPrice(

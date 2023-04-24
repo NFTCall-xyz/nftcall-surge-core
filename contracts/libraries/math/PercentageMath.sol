@@ -1,7 +1,12 @@
 // SPDX-License-Identifier: agpl-3.0
 pragma solidity 0.8.17;
 
+import {GENERAL_DECIMALS, GENERAL_UNIT} from "../DataTypes.sol";
 import {MathErrors} from "./MathErrors.sol";
+
+
+uint256 constant PERCENTAGE_FACTOR = GENERAL_UNIT; //percentage plus two decimals
+uint256 constant HALF_PERCENT = PERCENTAGE_FACTOR / 2;
 
 /**
  * @title PercentageMath library
@@ -12,8 +17,6 @@ import {MathErrors} from "./MathErrors.sol";
  **/
 
 library PercentageMath {
-  uint256 constant PERCENTAGE_FACTOR = 1e4; //percentage plus two decimals
-  uint256 constant HALF_PERCENT = PERCENTAGE_FACTOR / 2;
 
   /**
    * @dev Executes a percentage multiplication

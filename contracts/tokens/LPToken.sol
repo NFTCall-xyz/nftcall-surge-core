@@ -1,38 +1,41 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.17;
 import {IERC20, IERC20Metadata, ERC20, ERC4626} from "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {ILPToken} from "../interfaces/ILPToken.sol";
 import {IVault} from "../interfaces/IVault.sol";
 import {SimpleInitializable} from "../libraries/SimpleInitializable.sol";
-import {PercentageMath} from "../libraries/math/PercentageMath.sol";
+import {PERCENTAGE_FACTOR, PercentageMath} from "../libraries/math/PercentageMath.sol";
 
+import "../interfaces/ILPToken.sol";
 
 contract LPToken is ILPToken, ERC4626, Ownable, SimpleInitializable {
     using Math for uint256;
     using PercentageMath for uint256;
+    using SafeERC20 for IERC20;
     mapping(address => uint256) private _lockedBalances;
     address private _vault = address(0);
     uint256 private _maximumVaultBalance = 0;
-    uint256 private _minimumAssetToShareRatio = 1000; // 10%
-    uint256 private constant MAXIMUM_WITHDRAW_RATIO = 5000; // 50%
+    uint256 private _minimumAssetToShareRatio = PERCENTAGE_FACTOR * 10 / 100; // 10%
+    uint256 public constant MAXIMUM_WITHDRAW_RATIO = PERCENTAGE_FACTOR * 50 / 100; // 50%
+    uint256 public constant WITHDRAW_FEE_RATIO = PERCENTAGE_FACTOR * 3 / 1000; // 0.3%
     
     constructor(address assetAddress) 
       ERC4626(IERC20(assetAddress)) 
-      ERC20(string(abi.encodePacked("NFTSurge " , ERC20(asset()).name(), " Liquidity Provider Token")), 
-            string(abi.encodePacked("nlp" , ERC20(asset()).symbol()))) 
+      ERC20(string(abi.encodePacked("NFTSurge " , IERC20Metadata(assetAddress).name(), " Liquidity Provider Token")), 
+            string(abi.encodePacked("nlp" , IERC20Metadata(assetAddress).symbol()))) 
       Ownable()
     {
 
     }
 
     modifier onlyVault() {
-    if (msg.sender != _vault) {
-      revert OnlyVault(address(this), msg.sender, _vault);
+        if (msg.sender != _vault) {
+            revert OnlyVault(address(this), msg.sender, _vault);
+        }
+        _;
     }
-    _;
-  }
 
     function initialize(address vaultAddress, uint256 maxVaultBalance) public onlyOwner initializer {
         if(vaultAddress == address(0)){
@@ -40,6 +43,7 @@ contract LPToken is ILPToken, ERC4626, Ownable, SimpleInitializable {
         }
         _vault = vaultAddress;
         _maximumVaultBalance = maxVaultBalance;
+        IERC20(asset()).safeApprove(vaultAddress, type(uint256).max);
         emit Initialize(vaultAddress, maxVaultBalance);
     }
 
@@ -68,11 +72,12 @@ contract LPToken is ILPToken, ERC4626, Ownable, SimpleInitializable {
     function unlockBalance(address user, uint256 amount) public override onlyVault {
         if(_lockedBalances[user] == 0) return;
         _lockedBalances[user] -= amount;
+        emit UnlockBalance(user, amount);
     }
 
     function totalAssets() public view override returns (uint256) {
         IVault vaultContract = IVault(_vault);
-        int256 assets = int256(ERC4626.totalAssets() - vaultContract.unrealizedPremium()) + vaultContract.unrealizedPNL();
+        int256 assets = int256(super.totalAssets() - vaultContract.unrealizedPremium()) + vaultContract.unrealizedPNL();
         return assets > 0 ? uint256(assets) : 0;
     }
 
@@ -130,7 +135,20 @@ contract LPToken is ILPToken, ERC4626, Ownable, SimpleInitializable {
         return shares;
     }
 
-    function mint(uint256 shares, address receiver) public override onlyVault returns(uint256) {
+    function deposit(uint256 assets, address user, address receiver) public override onlyVault returns(uint256){
+        uint256 maximumDepositAssets = maxDeposit(receiver);
+        if(assets > maximumDepositAssets){
+            revert DepositMoreThanMax(address(this), assets, maximumDepositAssets);
+        }
+        uint256 shares = previewDeposit(assets);
+        if(shares.percentMul(_minimumAssetToShareRatio) > assets){
+            revert InsufficientAssetToShareRatio(address(this), assets, shares, _minimumAssetToShareRatio);
+        }
+        _deposit(user, receiver, assets, shares);
+        return shares;
+    }
+
+    function mint(uint256 shares, address receiver) public override returns(uint256) {
         uint256 maximumMintShares = maxMint(receiver);
         if(shares > maximumMintShares){
             revert MintMoreThanMax(address(this), shares, maximumMintShares);
@@ -143,12 +161,12 @@ contract LPToken is ILPToken, ERC4626, Ownable, SimpleInitializable {
         return assets;
     }
 
-    function withdraw(uint256 shares, address receiver, address owner) public override returns(uint256){
+    function withdraw(uint256 assets, address receiver, address owner) public override returns(uint256){
         uint256 maximumWithdrawShares = maxWithdraw(owner);
+        uint256 shares = previewWithdraw(assets);
         if(shares > maximumWithdrawShares){
             revert WithdrawMoreThanMax(address(this), shares, maximumWithdrawShares);
         }
-        uint256 assets = previewWithdraw(shares);
         _withdraw(_msgSender(), receiver, owner, assets, shares);
         return assets;
     }
@@ -161,6 +179,34 @@ contract LPToken is ILPToken, ERC4626, Ownable, SimpleInitializable {
         uint256 assets = previewRedeem(shares);
         _withdraw(_msgSender(), receiver, owner, assets, shares);
         return shares;
+    }
+
+    function _withdraw(
+        address caller,
+        address receiver,
+        address owner,
+        uint256 assets,
+        uint256 shares
+    ) internal virtual override {
+        if (caller != owner) {
+            _spendAllowance(owner, caller, shares);
+        }
+
+        // If _asset is ERC777, `transfer` can trigger a reentrancy AFTER the transfer happens through the
+        // `tokensReceived` hook. On the other hand, the `tokensToSend` hook, that is triggered before the transfer,
+        // calls the vault, which is assumed not malicious.
+        //
+        // Conclusion: we need to do the transfer after the burn so that any reentrancy would happen after the
+        // shares are burned and after the assets are transferred, which is a valid state.
+        _burn(owner, shares);
+        uint256 fee = assets.percentMul(WITHDRAW_FEE_RATIO);
+        IERC20 erc20Asset = IERC20(asset());
+        address reserve = IVault(_vault).reserve();
+        erc20Asset.safeTransfer(reserve, fee);
+        uint256 feeShares = _convertToShares(fee, Math.Rounding.Up);
+        erc20Asset.safeTransfer(receiver, (assets - fee));
+        emit Withdraw(caller, reserve, owner, fee, feeShares);
+        emit Withdraw(caller, receiver, owner, assets - fee, shares - feeShares);
     }
 
     /**
@@ -185,7 +231,7 @@ contract LPToken is ILPToken, ERC4626, Ownable, SimpleInitializable {
     function _initialConvertToShares(
         uint256 assets,
         Math.Rounding /*rounding*/
-    ) internal view override returns (uint256 shares) {
+    ) internal pure override returns (uint256 shares) {
         return assets;
     }
 
@@ -206,7 +252,7 @@ contract LPToken is ILPToken, ERC4626, Ownable, SimpleInitializable {
     function _initialConvertToAssets(
         uint256 shares,
         Math.Rounding /*rounding*/
-    ) internal view override returns (uint256 assets) {
+    ) internal pure override returns (uint256 assets) {
         return shares;
     }
 }

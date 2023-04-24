@@ -25,9 +25,4 @@ interface IOracle {
 
   function getAssetPriceAndVol(address asset) external view returns (uint256 price, uint256 vol);
 
-  function getPNL(address vault, address asset) external view returns(int256 pnl);
-
-  function getDelta(address vault, address asset) external view returns(int256 delta);
-
-  function getUpdateTimestampForVaultData(address vault) external view returns(uint256 timestamp);
 }

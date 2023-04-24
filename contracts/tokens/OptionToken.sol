@@ -6,9 +6,12 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
+import {DECIMALS, UNIT} from "../libraries/DataTypes.sol";
+
 import {IVault} from "../interfaces/IVault.sol";
-import {OptionType, PositionState, OptionPosition, IOptionToken} from "../interfaces/IOptionToken.sol";
 import {SimpleInitializable} from "../libraries/SimpleInitializable.sol";
+
+import "../interfaces/IOptionToken.sol";
 
 contract OptionToken is IOptionToken, ERC721Enumerable, Ownable, SimpleInitializable {
     using Strings for uint256;
@@ -16,7 +19,7 @@ contract OptionToken is IOptionToken, ERC721Enumerable, Ownable, SimpleInitializ
 
     address public immutable collection;
     address private _vault;
-    uint256 internal constant _decimals = 18;
+    uint256 internal constant _decimals = DECIMALS;
     uint256 private _totalValue;
     uint256 private _nextId = 1;
     string private _baseTokenURI;
@@ -60,7 +63,7 @@ contract OptionToken is IOptionToken, ERC721Enumerable, Ownable, SimpleInitializ
         emit UpdateBaseURI(baseURI);
     }
 
-    function openPosition(OptionType optionType, address to, uint256 strikeId, uint256 amount) public override onlyVault returns(uint256)
+    function openPosition(address to, OptionType optionType, uint256 strikeId, uint256 amount) public override onlyVault returns(uint256)
     {
         if(amount == 0) {
             revert ZeroAmount(address(this));
@@ -68,6 +71,7 @@ contract OptionToken is IOptionToken, ERC721Enumerable, Ownable, SimpleInitializ
         uint256 positionId = _nextId++;
         _options[positionId] = OptionPosition(strikeId, PositionState.PENDING, optionType, amount, 0);
         _totalValue += lockedValue(positionId);
+        emit OpenPosition(to, positionId, optionType, strikeId, amount);
         _safeMint(to, positionId);
         return positionId;
     }
@@ -80,6 +84,7 @@ contract OptionToken is IOptionToken, ERC721Enumerable, Ownable, SimpleInitializ
         }
         po.state = PositionState.ACTIVE;
         po.premium = premium;
+        emit ActivePosition(positionId, premium);
     }
 
     function closePosition(uint256 positionId) public override onlyVault
@@ -88,6 +93,7 @@ contract OptionToken is IOptionToken, ERC721Enumerable, Ownable, SimpleInitializ
             revert IsNotActive(address(this), positionId, _options[positionId].state);
         }
         _closePosition(positionId);
+        emit ClosePosition(positionId);
     }
 
     function forceClosePosition(uint256 positionId) public override onlyVault
@@ -96,6 +102,7 @@ contract OptionToken is IOptionToken, ERC721Enumerable, Ownable, SimpleInitializ
             revert IsNotPending(address(this), positionId, _options[positionId].state);
         }
         _closePosition(positionId);
+        emit ForceClosePosition(positionId);
     }
 
     function _closePosition(uint256 positionId) internal {
@@ -110,19 +117,28 @@ contract OptionToken is IOptionToken, ERC721Enumerable, Ownable, SimpleInitializ
     }
 
     function lockedValue(uint256 positionId) public view override returns(uint256) {
-        OptionPosition memory po = _options[positionId];
-        if(po.optionType == OptionType.LONG_CALL) {
-            return IVault(_vault).strike(po.strikeId).spotPrice.mulDiv(po.amount, 10 ** _decimals, Math.Rounding.Up);
+        OptionPosition memory position = _options[positionId];
+        if(position.state == PositionState.EMPTY) {
+            revert NonexistentPosition(address(this), positionId);
+        }
+        if(position.optionType == OptionType.LONG_CALL) {
+            return IVault(_vault).strike(position.strikeId).spotPrice.mulDiv(position.amount, UNIT, Math.Rounding.Up);
         } else {
-            return IVault(_vault).strike(po.strikeId).strikePrice.mulDiv(po.amount, 10 ** _decimals, Math.Rounding.Up);
+            return IVault(_vault).strike(position.strikeId).strikePrice.mulDiv(position.amount, UNIT, Math.Rounding.Up);
         }
     }
 
-    function optionPosition(uint256 positionId) public view override returns(OptionPosition memory) {
-        return _options[positionId];
+    function optionPosition(uint256 positionId) public view override returns(OptionPosition memory position) {
+        position = _options[positionId];
+        if(position.state == PositionState.EMPTY) {
+            revert NonexistentPosition(address(this), positionId);
+        }
     }
 
-    function optionPositionState(uint256 positionId) public view override returns(PositionState) {
-        return _options[positionId].state;
+    function optionPositionState(uint256 positionId) public view override returns(PositionState state) {
+        state = _options[positionId].state;
+        if(state == PositionState.EMPTY){
+            revert NonexistentPosition(address(this), positionId);
+        }
     }
 }

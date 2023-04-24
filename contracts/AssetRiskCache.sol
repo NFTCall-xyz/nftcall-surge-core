@@ -21,7 +21,7 @@ import "./OptionPricer.sol";
  * @author NFTCall
  * @dev Update Delta and PNL for every collection
  */
-contract AssetRiskCache is Ownable, SimpleInitializable, ReentrancyGuard {
+contract AssetRiskCache is IAssetRiskCache, Ownable, SimpleInitializable, ReentrancyGuard {
   using DecimalMath for uint;
   using SignedDecimalMath for int;
   using BlackScholes for BlackScholes.BlackScholesInputs;
@@ -29,28 +29,19 @@ contract AssetRiskCache is Ownable, SimpleInitializable, ReentrancyGuard {
   struct AssetRisk {
     // The risks is to asset, not to buyers/traders
     int delta;
-    int PNL;
+    int unrealizedPNL;
   }
 
-  // Need a def of decimals for all contracts?
-  uint constant public riskDecimals = 1e4;
   // L1 address of asset => its AssetRisk
   mapping(address => AssetRisk) internal assetRisks;
   
-
   function getAssetRisk(address asset) public view returns (int delta, int PNL) {
-    return (assetRisks[asset].delta, assetRisks[asset].PNL);
+    return (assetRisks[asset].delta, assetRisks[asset].unrealizedPNL);
   }
 
-  function getRiskDecimals() public pure returns (uint) {
-    return riskDecimals;
-  }
-
-  /*function updateAssetRisk(address asset, int delta, int PNL) external onlyUpdater {
+  function updateAssetRisk(address asset, int delta, int PNL) external onlyOwner {
     AssetRisk storage ar = assetRisks[asset];
-    ar = AssetRisk(delta, PNL);
-  }*/
-
-
-
+    ar.delta = delta;
+    ar.unrealizedPNL = PNL;
+  }
 }
