@@ -23,6 +23,30 @@ makeSuite('Vault', (testEnv) => {
     expect(balance).to.be.equal(amount);
   });
 
+  it("Should not be able to withdraw", async() => {
+    const { vault, deployer, lpToken} = testEnv;
+    if(vault == undefined || lpToken == undefined || deployer == undefined) {
+      throw new Error('testEnv not initialized');
+    }
+    const amount = ethers.utils.parseEther('100');
+    await expect(vault.withdraw(amount, deployer.address))
+          .to.be.revertedWithCustomError(lpToken, "WithdrawMoreThanMax")
+          .withArgs(lpToken.address, amount, 0);
+  })
+
+  it("Should not be able to claim", async() => {
+    const { deployer, lpToken} = testEnv;
+    if(lpToken == undefined || deployer == undefined) {
+      throw new Error('testEnv not initialized');
+    }
+    const releaseTime = await lpToken.releaseTime(deployer.address);
+    const blockTimestamp = await time.latest() + 1;
+    await time.setNextBlockTimestamp(blockTimestamp);
+    await expect(lpToken.claim(deployer.address))
+          .to.be.revertedWithCustomError(lpToken, "ClaimBeforeReleaseTime")
+          .withArgs(lpToken.address, deployer.address, releaseTime, blockTimestamp);
+  })
+
   it("Should be able to withdraw", async () => {
     const { vault, dai, lpToken, deployer, reserve } = testEnv;
     if(vault === undefined || lpToken === undefined || dai === undefined || deployer === undefined || reserve === undefined){
@@ -35,7 +59,7 @@ makeSuite('Vault', (testEnv) => {
     await vault.deposit(amount, deployer.address);
     await lpToken.approve(vault.address, amount);
     const releaseTime = await lpToken.releaseTime(deployer.address);
-    await time.increaseTo(releaseTime.toNumber() + 1);
+    await time.increaseTo(releaseTime.toNumber());
     await lpToken.claim(deployer.address);
     await vault.withdraw(amount, deployer.address);
     const balance = await dai.balanceOf(deployer.address);
@@ -67,7 +91,15 @@ makeSuite('Vault', (testEnv) => {
     const market = markets['BAYC'];
     const nft = market.nft;
     const optionToken = market.optionToken;
-    const openTxRec = await waitTx(await vault.openPosition(nft, deployer.address, 0, bigNumber(12, 19), Math.floor(Date.now() / 1000) + 4 * 24 * 3600, bigNumber(1, 18)));
+    const expiry = await time.latest() + 4 * 3600 * 24;
+    const openTxRec = await waitTx(
+      await vault.openPosition(
+        nft, 
+        deployer.address, 
+        0, 
+        bigNumber(12, 19), 
+        expiry, 
+        bigNumber(1, 18)));
     const events = openTxRec.events;
     expect(events).is.not.undefined;
     const openEvent = events[events.length - 1];

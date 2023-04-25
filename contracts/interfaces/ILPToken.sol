@@ -22,5 +22,5 @@ interface ILPToken {
     error WithdrawMoreThanMax(address thrower, uint256 assets, uint256 maxWithdrawableAssets);
     error RedeemMoreThanMax(address thrower, uint256 shares, uint256 maxRedeemableShares);
     error InsufficientAssetToShareRatio(address thrower, uint256 assets, uint256 shares, uint256 minimumRatio);
-    error ClaimBeforeTheReleaseTime(address thrower, address user, uint256 releaseTime, uint256 blockTimestamp);
+    error ClaimBeforeReleaseTime(address thrower, address user, uint256 releaseTime, uint256 blockTimestamp);
 }    

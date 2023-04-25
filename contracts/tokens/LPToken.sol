@@ -81,7 +81,7 @@ contract LPToken is ILPToken, ERC4626, Ownable, SimpleInitializable {
 
     function claim(address user) public override returns(uint256 shares) {
         if(block.timestamp < _lockedBalances[user].releaseTime){
-            revert ClaimBeforeTheReleaseTime(address(this), user, _lockedBalances[user].releaseTime, block.timestamp);
+            revert ClaimBeforeReleaseTime(address(this), user, _lockedBalances[user].releaseTime, block.timestamp);
         }
         shares = _lockedBalances[user].lockedBalance;
         if(shares > 0){
