@@ -1,5 +1,5 @@
 import { expect } from 'chai';
-import { ethers } from 'ethers';
+import { ethers, BigNumber } from 'ethers';
 import { time } from '@nomicfoundation/hardhat-network-helpers'
 import { makeSuite } from './make-suite';
 import { bigNumber } from '../scripts/utils';
@@ -91,7 +91,7 @@ makeSuite('Vault', (testEnv) => {
     const market = markets['BAYC'];
     const nft = market.nft;
     const optionToken = market.optionToken;
-    const expiry = await time.latest() + 4 * 3600 * 24;
+    const expiry = await time.latest() + 28 * 3600 * 24;
     const openTxRec = await waitTx(
       await vault.openPosition(
         nft, 
@@ -103,6 +103,6 @@ makeSuite('Vault', (testEnv) => {
     const events = openTxRec.events;
     expect(events).is.not.undefined;
     const openEvent = events[events.length - 1];
-    expect(openEvent.args['estimatedPremium']).to.be.greaterThan(0);
+    expect(openEvent.args['estimatedPremium']).to.be.equal(BigNumber.from(778209).mul(150).add(50).div(100));
   });
 });

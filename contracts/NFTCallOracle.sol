@@ -4,6 +4,8 @@ pragma solidity ^0.8.17;
 import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./interfaces/IOracle.sol";
+import { GENERAL_UNIT, UNIT } from "./libraries/DataTypes.sol";
+
 
 
 /**
@@ -34,6 +36,10 @@ contract NFTCallOracle is IOracle, Ownable, Pausable {
         uint16 vol; // Retain one decimal. If volatility is 3.56% , the input vol is 36
         uint256 index; // 1 ~ 8
     }
+    uint256 public constant PRICE_UNIT = 100;
+    uint256 public constant PRICE_DECIMALS = 2;
+    uint256 public constant VOL_UNIT = 1000;
+    uint256 public constant VOL_DECIMALS = 3;
     uint16 private constant VOL_LIMIT = 300; // 30%
 
     // Event
@@ -178,8 +184,8 @@ contract NFTCallOracle is IOracle, Ownable, Pausable {
         address asset
     ) private view returns (uint256 price, uint256 vol) {
         (uint16 p, uint16 v) = _getPriceByIndex(asset);
-        price = uint256(p) * 1e16;
-        vol = uint256(v) * 10;
+        price = uint256(p) * (UNIT / PRICE_UNIT);
+        vol = uint256(v) * (UNIT / VOL_UNIT);
     }
 
     function getAssetPriceAndVol(address asset) external view returns (uint256 price, uint256 vol) {

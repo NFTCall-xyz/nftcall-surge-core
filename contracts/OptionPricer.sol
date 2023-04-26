@@ -19,8 +19,12 @@ import "./interfaces/IOracle.sol";
 import "./interfaces/IAssetRiskCache.sol";
 import {OptionType} from "./interfaces/IOptionToken.sol";
 import {GENERAL_DECIMALS, GENERAL_UNIT } from "./libraries/DataTypes.sol";
+import { PERCENTAGE_FACTOR } from "./libraries/math/PercentageMath.sol";
+
 
 import "./interfaces/IPricer.sol";
+
+import "hardhat/console.sol";
 
 
 /**
@@ -49,7 +53,7 @@ contract OptionPricer is IPricer, Ownable, SimpleInitializable {
   NFTCallOracle internal oracle;
   PricerParams private pricerParams;
   // riskFreeRate is ETH POS interest rate, now annually 4.8%.
-  int private riskFreeRate = 480;
+  int private riskFreeRate = int(PERCENTAGE_FACTOR * 48 / 1000);
 
   function initialize(address riskCache_, address oracle_) public onlyOwner initializer {
     risk = AssetRiskCache(riskCache_);
@@ -85,6 +89,7 @@ contract OptionPricer is IPricer, Ownable, SimpleInitializable {
 
   function getPremium(OptionType ot, uint S, uint K, uint vol, uint duration) public view override returns (uint) {
     (uint call, uint put) = optionPrices(S, K, vol, duration);
+    console.log("got price: %s, %s", call, put);
     if (ot == OptionType.LONG_CALL)
       return call;
     else if (ot == OptionType.LONG_PUT)
@@ -97,11 +102,13 @@ contract OptionPricer is IPricer, Ownable, SimpleInitializable {
     uint decimalsDiff = 10 ** (DecimalMath.decimals-GENERAL_DECIMALS);
     BlackScholes.BlackScholesInputs memory bsInput = BlackScholes.BlackScholesInputs(
       duration,
-      vol * decimalsDiff,
-      S * decimalsDiff,
-      K * decimalsDiff,
+      vol,
+      S,
+      K,
       riskFreeRate * int(decimalsDiff)
     );
+    console.log('duration: %s, vol: %s,  riskFreeRate: %s', duration, vol, uint256(bsInput.rateDecimal));
+    console.log('strike price: %s, spot price: %s', K, S);
     (call, put) = BlackScholes.optionPrices(bsInput);
     call /= decimalsDiff;
     put /= decimalsDiff;
