@@ -15,7 +15,7 @@ task('optionToken:deploy', 'Deploy OptionToken')
         await hre.run('set-DRE');
         const nftAddress = await getAddress(nftSymbol);
         const optionToken = await deployOptionToken(
-            nftAddress, `NFTSurge ${nftSymbol} option`, `option${nftSymbol}`, baseURI, market, verify);
+            nftAddress, `NFTSurge ${nftSymbol} Options Token`, `nc${nftSymbol}`, baseURI, market, verify);
     });
 
 task('optionToken:init', 'Initialize OptionToken')

@@ -24,11 +24,12 @@ import { BigNumber } from 'ethers';
 task('lpToken:deploy', 'Deploy LP Token')
     .addFlag('verify', 'Verify contract at Etherscan')
     .addParam('underlying', 'Underlying asset symbol')
-    .setAction(async ({ verify, underlying }, hre) => {
+    .addParam('underlyingName', 'Underlying asset name')
+    .setAction(async ({ verify, underlying, underlyingName }, hre) => {
         await hre.run('set-DRE');
         const underlyingAddress = await getAddress(underlying);
         if(!underlyingAddress) throw new Error(`Asset ${underlying} not found`);
-        const lpToken = await deployLPToken(underlyingAddress, verify);
+        const lpToken = await deployLPToken(underlyingAddress, `NFTCall ${underlyingName}`, `nc${underlyingName}`, verify);
     });
 
 task('blackScholes:deploy', 'Deploy Black Scholes')

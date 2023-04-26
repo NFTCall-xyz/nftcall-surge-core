@@ -27,17 +27,17 @@ async function buildTestEnv() {
 
     // oracle
     const [ _, owner, operator, ...a] = accounts;
-    const erc20 = await deployMintableERC20("Mocked Dai", "DAI");
+    const erc20 = await deployMintableERC20("Mocked WETH", "WETH");
     const nft = await deployMintableERC721("Mocked BAYC", "BAYC");
     const oracle = await deployOracle(await operator.getAddress());
-    const lpToken = await deployLPToken(erc20.address);
+    const lpToken = await deployLPToken(erc20.address, 'NFTCall ETH', 'ncETH');
     await deployBlackScholes();
     const pricer = await deployPricer();
     const riskCache = await deployRiskCache();
     const reserve = await deployReserve();
     const vault = await deployVault(erc20.address, lpToken.address, oracle.address, pricer.address, riskCache.address, reserve.address);
     await initializeLPToken(bigNumber(1000000, 18));
-    const optionToken = await deployOptionToken(nft.address, "NFTSurge BAYC option", "optionBAYC", "https://bayc.finance/", "BAYC");
+    const optionToken = await deployOptionToken(nft.address, "NFTCall BAYC Options Token", "ncBAYC", "https://bayc.finance/", "BAYC");
     await oracle.addAssets([nft.address]);
     await oracle.setOperator(operator.address);
     const [outerIndex, innerIndex] = await oracle.getIndexes(nft.address);

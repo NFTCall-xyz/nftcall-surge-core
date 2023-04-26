@@ -84,9 +84,9 @@ export const deployContract = async<T> (contractName: string, args: any[], dbNam
     return contract as T;
 }
 
-export const deployLPToken = async (erc20Asset: string, verify: boolean = false) => {
+export const deployLPToken = async (erc20Asset: string, name: string, symbol: string, verify: boolean = false) => {
     console.log(`Deploying LPToken contract for ${erc20Asset}...`);
-    const lpToken = await deployContract<LPToken>('LPToken', [erc20Asset]);
+    const lpToken = await deployContract<LPToken>('LPToken', [erc20Asset, name, symbol]);
     return lpToken;
 }
 

@@ -27,10 +27,9 @@ contract LPToken is ILPToken, ERC4626, Ownable, SimpleInitializable {
     uint256 public constant WITHDRAW_FEE_RATIO = PERCENTAGE_FACTOR * 3 / 1000; // 0.3%
     uint256 public constant LOCK_PERIOD = 3 days;
     
-    constructor(address assetAddress) 
+    constructor(address assetAddress, string memory name, string memory symbol) 
       ERC4626(IERC20(assetAddress)) 
-      ERC20(string(abi.encodePacked("NFTSurge " , IERC20Metadata(assetAddress).name(), " Liquidity Provider Token")), 
-            string(abi.encodePacked("nlp" , IERC20Metadata(assetAddress).symbol()))) 
+      ERC20(name, symbol)
       Ownable()
     {
 

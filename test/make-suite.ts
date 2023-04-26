@@ -44,7 +44,7 @@ export interface TestEnv {
     pricer?: OptionPricer;
     riskCache?: AssetRiskCache;
     lpToken?: LPToken;
-    dai?: MintableERC20;
+    eth?: MintableERC20;
     markets: {[key:string]: Market};
 };
 
@@ -75,7 +75,7 @@ export const initializeMakeSuite = async () => {
     testEnv.pricer = await getPricer();
     testEnv.riskCache = await getRiskCache();
     testEnv.lpToken = await getLPToken();
-    testEnv.dai = await getMintableERC20('DAI');
+    testEnv.eth = await getMintableERC20('WETH');
     const baycAddress = await getAddress('BAYC');
     const baycOption = await getOptionToken('BAYC');
     if(baycAddress !== undefined && baycOption !== undefined) {

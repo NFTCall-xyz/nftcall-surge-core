@@ -11,13 +11,13 @@ makeSuite('Vault', (testEnv) => {
   });
 
   it("Should be able to deposit", async () => {
-    const { vault, dai, lpToken, deployer } = testEnv;
-    if(vault === undefined || lpToken === undefined || dai === undefined || deployer === undefined){
+    const { vault, eth, lpToken, deployer } = testEnv;
+    if(vault === undefined || lpToken === undefined || eth === undefined || deployer === undefined){
       throw new Error('testEnv not initialized');
     }
     const amount = ethers.utils.parseEther("10000");
-    await dai.mint(amount);
-    await dai.approve(lpToken.address, amount);
+    await eth.mint(amount);
+    await eth.approve(lpToken.address, amount);
     await vault.deposit(amount, deployer.address);
     const balance = await lpToken.lockedBalanceOf(deployer.address);
     expect(balance).to.be.equal(amount);
@@ -48,29 +48,29 @@ makeSuite('Vault', (testEnv) => {
   })
 
   it("Should be able to withdraw", async () => {
-    const { vault, dai, lpToken, deployer, reserve } = testEnv;
-    if(vault === undefined || lpToken === undefined || dai === undefined || deployer === undefined || reserve === undefined){
+    const { vault, eth, lpToken, deployer, reserve } = testEnv;
+    if(vault === undefined || lpToken === undefined || eth === undefined || deployer === undefined || reserve === undefined){
       throw new Error('testEnv not initialized');
     }
     const amount = ethers.utils.parseEther("100");
     const fee = amount.mul(3).div(1000);
-    await dai.mint(amount);
-    await dai.approve(lpToken.address, amount);
+    await eth.mint(amount);
+    await eth.approve(lpToken.address, amount);
     await vault.deposit(amount, deployer.address);
     await lpToken.approve(vault.address, amount);
     const releaseTime = await lpToken.releaseTime(deployer.address);
     await time.increaseTo(releaseTime.toNumber());
     await lpToken.claim(deployer.address);
     await vault.withdraw(amount, deployer.address);
-    const balance = await dai.balanceOf(deployer.address);
+    const balance = await eth.balanceOf(deployer.address);
     expect(balance).to.be.equal(amount.sub(fee));
-    const reserveBalance = await dai.balanceOf(reserve.address);
+    const reserveBalance = await eth.balanceOf(reserve.address);
     expect(reserveBalance).to.be.equal(fee);
   });
 
   it("Should not be able to withdraw all the remaining assets", async () => {
-    const { vault, dai, lpToken, deployer } = testEnv;
-    if(vault === undefined || lpToken === undefined || dai === undefined || deployer === undefined){
+    const { vault, eth, lpToken, deployer } = testEnv;
+    if(vault === undefined || lpToken === undefined || eth === undefined || deployer === undefined){
       throw new Error('testEnv not initialized');
     }
     const amount = ethers.utils.parseEther("10000");
@@ -81,13 +81,13 @@ makeSuite('Vault', (testEnv) => {
   });
 
   it("Should be able to open a position", async () => {
-    const { vault, dai, lpToken, deployer, markets } = testEnv;
-    if(vault === undefined || lpToken === undefined || dai === undefined || deployer === undefined || Object.keys(markets).length == 0){
+    const { vault, eth, lpToken, deployer, markets } = testEnv;
+    if(vault === undefined || lpToken === undefined || eth === undefined || deployer === undefined || Object.keys(markets).length == 0){
       throw new Error('testEnv not initialized');
     }
     const amount = ethers.utils.parseEther("100");
-    await dai.mint(amount);
-    await dai.approve(lpToken.address, amount);
+    await eth.mint(amount);
+    await eth.approve(lpToken.address, amount);
     const market = markets['BAYC'];
     const nft = market.nft;
     const optionToken = market.optionToken;
