@@ -101,6 +101,10 @@ contract Vault is IVault, Pausable, Ownable{
         LPToken(_lpToken).deposit(amount, msg.sender, onBehalfOf);
     }
 
+    function claimLPToken(address user) public override{
+        LPToken(_lpToken).claim(user);
+    }
+
     function withdraw(uint256 amount, address to) public override returns(uint256){
         return LPToken(_lpToken).withdraw(amount, to, msg.sender);
     }
@@ -133,16 +137,41 @@ contract Vault is IVault, Pausable, Ownable{
         } 
     }
 
+    function _maximumLockedValueOfCollection(CollectionConfiguration memory collection, uint256 liquidity) internal pure returns (uint256){
+        return liquidity.percentMul(collection.weight);
+    }
+
+    function _maximumLockedValue(uint256 liquidity) internal pure returns (uint256) {
+        return liquidity.percentMul(MAXIMUM_LOCK_RATIO);
+    }
+
     function _validateOpenOption2(CollectionConfiguration memory collection, uint256 valueToBeLocked, uint256 premium) internal view
     {
         uint256 currentAmount = IERC20(_asset).balanceOf(_lpToken) + premium;
         uint256 totalLockedValue = OptionToken(collection.optionToken).totalValue();
-        if(totalLockedValue + valueToBeLocked > currentAmount.percentMul(collection.weight)){
+        if(totalLockedValue + valueToBeLocked > _maximumLockedValueOfCollection(collection, currentAmount)){
             revert InsufficientLiquidityForCollection(address(this), OptionToken(collection.optionToken).collection(), totalLockedValue, valueToBeLocked, currentAmount);
         }
-        if(_totalLockedAssets + valueToBeLocked > currentAmount.percentMul(MAXIMUM_LOCK_RATIO)){
+        if(_totalLockedAssets + valueToBeLocked > _maximumLockedValue(currentAmount)){
             revert InsufficientLiquidity(address(this), _totalLockedAssets, valueToBeLocked, currentAmount);
         }
+    }
+
+    function maximumOptionAmount(address collection, OptionType optionType) external view override returns(uint256 amount) {
+        CollectionConfiguration storage config = _collections[collection];
+        uint256 currentAmount = IERC20(_asset).balanceOf(_lpToken);
+        uint256 totalLockedValue = OptionToken(config.optionToken).totalValue();
+        uint256 maximumLockedValueOfCollection = _maximumLockedValueOfCollection(config, currentAmount);
+        if(totalLockedValue >= maximumLockedValueOfCollection){
+            return 0;
+        }
+        uint256 maximumLockedValue = _maximumLockedValue(currentAmount);
+        if(_totalLockedAssets >= maximumLockedValue){
+            return 0;
+        }
+        uint256 spotPrice = IOracle(_oracle).getAssetPrice(collection);
+        uint256 maximumOptionValue = Math.max(maximumLockedValueOfCollection - totalLockedValue, maximumLockedValue - _totalLockedAssets);
+        amount = maximumOptionValue.mulDiv(UNIT, spotPrice, Math.Rounding.Down);
     }
 
     function strike(uint256 strikeId) public view override returns(Strike memory s){

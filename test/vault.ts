@@ -60,7 +60,7 @@ makeSuite('Vault', (testEnv) => {
     await lpToken.approve(vault.address, amount);
     const releaseTime = await lpToken.releaseTime(deployer.address);
     await time.increaseTo(releaseTime.toNumber());
-    await lpToken.claim(deployer.address);
+    await vault.claimLPToken(deployer.address);
     await vault.withdraw(amount, deployer.address);
     const balance = await eth.balanceOf(deployer.address);
     expect(balance).to.be.equal(amount.sub(fee));

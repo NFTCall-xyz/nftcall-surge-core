@@ -35,6 +35,7 @@ interface IVault {
     function updateUnrealizedPNL() external returns(int256);
     function unrealizedPremium() external view returns(uint256);
     function deposit(uint256 amount, address onBehalfOf) external;
+    function claimLPToken(address user) external;
     function withdraw(uint256 amount, address to) external returns(uint256);
     function totalAssets() external view returns(uint256);
     function totalLockedAssets() external view returns(uint256);
@@ -46,6 +47,7 @@ interface IVault {
     function addMarket(address collection, uint32 weight, address optionToken) external returns(uint32);
     function markets() external view returns(address[] memory);
     function marketConfiguration(address collection) external view returns(CollectionConfiguration memory);
+    function maximumOptionAmount(address collection, OptionType optionType) external view returns(uint256);
 
     error ZeroAmount(address thrower);
     error InvalidStrikePrice(address thrower, uint strikePrice, uint spotPrice);
