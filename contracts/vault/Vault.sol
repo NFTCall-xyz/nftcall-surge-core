@@ -31,8 +31,7 @@ contract Vault is IVault, Pausable, Ownable{
     address private _riskCache;
     address private _pricer;
     address private _reserve;
-    uint256 private _nextId = 1;
-    mapping(address => CollectionConfiguration) private _collections;
+    uint256 private _nextId = 1;    mapping(address => CollectionConfiguration) private _collections;
     mapping(uint256 => address) private _collectionsList;
     mapping(uint256 => Strike) private _strikes;
 
@@ -85,7 +84,7 @@ contract Vault is IVault, Pausable, Ownable{
             address collection = _collectionsList[i];
             CollectionConfiguration storage config = _collections[collection];
             if(config.activated){
-                (int256 PNL, ) = IAssetRiskCache(_riskCache).getAssetRisk(collection);
+                (,int256 PNL) = IAssetRiskCache(_riskCache).getAssetRisk(collection);
                 newPNL += PNL;
             }
         }

@@ -150,7 +150,7 @@ contract LPToken is ILPToken, ERC4626, Ownable, SimpleInitializable {
         if(shares.percentMul(_minimumAssetToShareRatio) > assets){
             revert InsufficientAssetToShareRatio(address(this), assets, shares, _minimumAssetToShareRatio);
         }
-        _deposit(_msgSender(), address(this), assets, shares);
+        _deposit(_msgSender(), receiver, assets, shares);
         return shares;
     }
 
