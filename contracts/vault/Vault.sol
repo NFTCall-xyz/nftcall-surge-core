@@ -7,7 +7,7 @@ import {Pausable} from "@openzeppelin/contracts/security/Pausable.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {StorageSlot} from "@openzeppelin/contracts/utils/StorageSlot.sol";
-import {STRIKE_PRICE_GAP_LIST_SIZE, DURATION_LIST_SIZE, DECIMALS, UNIT} from "../libraries/DataTypes.sol";
+import {DECIMALS, UNIT} from "../libraries/DataTypes.sol";
 import {PERCENTAGE_FACTOR, PercentageMath} from "../libraries/math/PercentageMath.sol";
 import {LPToken} from "../tokens/LPToken.sol";
 import {OptionType, OptionPosition, PositionState, IOptionToken} from "../interfaces/IOptionToken.sol";
