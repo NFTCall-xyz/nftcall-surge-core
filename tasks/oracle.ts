@@ -6,6 +6,7 @@ import {
     waitTx,
 } from '../scripts/utils/contracts';
 
+import { DRE } from '../scripts/utils';
 import { BigNumber } from 'ethers';
 
 task('oracle:deploy', 'Deploy Oracle')
@@ -44,7 +45,9 @@ task('dev:oracle:setAssetPriceAndVolatility', 'Set asset price')
         await hre.run('set-DRE');
         const oracle = await getOracle();
         if(!oracle) throw new Error(`Oracle not found`);
-        const operator = (await hre.ethers.getSigners())[2];
+        const deployOnDevServer = (DRE.network.name === 'localhost' || DRE.network.name === 'hardhat');
+        const accounts = await hre.ethers.getSigners();
+        const operator = accounts[1] || accounts[0];
         if(!operator) throw new Error(`Operator not found`);
         const assetAddress = await getAddress(asset);
         if(!assetAddress) throw new Error(`Asset ${asset} not found`);
