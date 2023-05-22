@@ -4,64 +4,54 @@ pragma solidity 0.8.17;
 import "./interfaces/IOracle.sol";
 import "./interfaces/IVault.sol";
 
+import "./interfaces/ISurgeUI.sol";
+
 contract SurgeUI {
+    function _getCollection(
+        address collectionAddress,
+        address oracleAddress,
+        address vaultAddress
+    ) internal view returns (Collection memory) {
+        Collection memory collection_;
+
+        IOracle oracleInstance = IOracle(oracleAddress);
+        (collection_.price, collection_.vol) = oracleInstance
+            .getAssetPriceAndVol(collectionAddress);
+
+        // IVault vaultInstance = IVault(vaultAddress);
+        // collection_.maximumOptionAmount = vaultInstance.maximumOptionAmount(
+        //     collectionAddress,
+        //     OptionType.LONG_CALL
+        // );
+        collection_.maximumOptionAmount = 0;
+
+        return collection_;
+    }
+
     function getCollections(
         address[] memory collectionAddresses,
         address oracleAddress,
         address vaultAddress
-    )
-        external
-        view
-        returns (uint256[] memory, uint256[] memory, uint256[] memory)
-    {
-        IOracle oracleInstance = IOracle(oracleAddress);
-        uint256 length = collectionAddresses.length;
-        uint256[] memory prices = new uint256[](length);
-        uint256[] memory volumes = new uint256[](length);
-        uint256[] memory maximumOptionAmounts = new uint256[](length);
-
-        uint256[2][] memory oracleGetAssetsReturnValue = oracleInstance
-            .getAssets(collectionAddresses);
-        IVault vaultInstance = IVault(vaultAddress);
-
-        for (uint256 i = 0; i < length; i++) {
-            prices[i] = oracleGetAssetsReturnValue[i][0];
-            volumes[i] = oracleGetAssetsReturnValue[i][1];
-
-            // maximumOptionAmounts[i] = 0;
-            maximumOptionAmounts[i] = vaultInstance.maximumOptionAmount(
+    ) external view returns (Collection[] memory) {
+        Collection[] memory collections = new Collection[](
+            collectionAddresses.length
+        );
+        for (uint256 i = 0; i < collectionAddresses.length; i++) {
+            collections[i] = _getCollection(
                 collectionAddresses[i],
-                OptionType.LONG_CALL
+                oracleAddress,
+                vaultAddress
             );
         }
 
-        return (prices, volumes, maximumOptionAmounts);
+        return collections;
     }
 
     function getCollection(
         address collectionAddress,
         address oracleAddress,
         address vaultAddress
-    ) external view returns (address, uint256, uint256, uint256) {
-        address[] memory collectionAddresses = new address[](1);
-        collectionAddresses[0] = collectionAddress;
-
-        IOracle oracleInstance = IOracle(oracleAddress);
-        uint256[2][] memory oracleGetAssetsReturnValue = oracleInstance
-            .getAssets(collectionAddresses);
-
-        IVault vaultInstance = IVault(vaultAddress);
-        uint256 maximumOptionAmount = vaultInstance.maximumOptionAmount(
-            collectionAddress,
-            OptionType.LONG_CALL
-        );
-        // uint256 maximumOptionAmount = 0;
-
-        return (
-            collectionAddress,
-            oracleGetAssetsReturnValue[0][0],
-            oracleGetAssetsReturnValue[0][1],
-            maximumOptionAmount
-        );
+    ) external view returns (Collection memory) {
+        return _getCollection(collectionAddress, oracleAddress, vaultAddress);
     }
 }
