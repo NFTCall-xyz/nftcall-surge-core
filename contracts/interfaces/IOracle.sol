@@ -25,4 +25,5 @@ interface IOracle {
 
   function getAssetPriceAndVol(address asset) external view returns (uint256 price, uint256 vol);
 
+  function getAssets(address[] memory assets) external view returns (uint256[2][] memory prices);
 }

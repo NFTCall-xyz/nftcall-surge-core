@@ -15,6 +15,7 @@ import {
     MintableERC721,
     BlackScholes,
     KeeperHelper,
+    SurgeUI,
 } from '../../types';
 
 function getKey(name: string, marketName?: string) {
@@ -278,4 +279,9 @@ export const initializeMarket = async(marketName: string, weight: BigNumber) => 
         throw Error(`The OptionToken for ${marketName} is not deployed`);
     }
     await waitTx(await vault.addMarket(nftAddress, weight, optionTokenAddress));
+}
+
+export const deploySurgeUI = async ( verify: boolean = false) => {
+    const ui = await deployContract<SurgeUI>('SurgeUI', []);
+    return ui;
 }
