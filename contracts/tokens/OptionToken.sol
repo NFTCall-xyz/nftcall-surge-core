@@ -133,6 +133,7 @@ contract OptionToken is IOptionToken, ERC721Enumerable, Ownable, SimpleInitializ
         if(position.state == PositionState.EMPTY) {
             revert NonexistentPosition(address(this), positionId);
         }
+        return position;
     }
 
     function optionPositionState(uint256 positionId) public view override returns(PositionState state) {
@@ -140,5 +141,6 @@ contract OptionToken is IOptionToken, ERC721Enumerable, Ownable, SimpleInitializ
         if(state == PositionState.EMPTY){
             revert NonexistentPosition(address(this), positionId);
         }
+        return state;
     }
 }
