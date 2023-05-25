@@ -96,7 +96,7 @@ contract OptionToken is IOptionToken, ERC721Enumerable, Ownable, SimpleInitializ
         emit ClosePosition(positionId);
     }
 
-    function forceClosePosition(uint256 positionId) public override onlyVault
+    function forceClosePendingPosition(uint256 positionId) public override onlyVault
     {
         if(_options[positionId].state != PositionState.PENDING) {
             revert IsNotPending(address(this), positionId, _options[positionId].state);

@@ -230,7 +230,7 @@ contract Vault is IVault, Pausable, Ownable{
         return (positionId, premium);
     }
 
-    function activePosition(address collection, uint256 positionId) public override onlyOwner returns(uint256 premium){
+    function activePosition(address collection, uint256 positionId) public override onlyKeeper returns(uint256 premium){
         OptionToken optionToken = OptionToken(_collections[collection].optionToken);
         OptionPosition memory position = optionToken.optionPosition(positionId);
         Strike memory strike_ = _strikes[position.strikeId];
@@ -256,7 +256,7 @@ contract Vault is IVault, Pausable, Ownable{
         IERC20(_asset).safeTransferFrom(msg.sender, _lpToken, premium - amountToReserve);
     }
 
-    function closePosition(address collection, address to, uint256 positionId) public override onlyOwner returns(uint256 profit){
+    function closePosition(address collection, uint256 positionId) public override onlyKeeper returns(uint256 profit){
         //calculate fee
         //burn callOption token
         //transfer revenue from the vault to caller
@@ -294,6 +294,7 @@ contract Vault is IVault, Pausable, Ownable{
         uint256 fee;
         (profit, fee) = _calculateExerciseProfit(position.optionType, currentPrice, strike_.strikePrice, position.amount);
         if(profit != 0){
+            address to = optionToken.ownerOf(positionId);
             _realizedPNL -= int256(profit + fee);
             IERC20(_asset).safeTransferFrom(_lpToken, _reserve, fee);
             IERC20(_asset).safeTransferFrom(_lpToken, to, profit);
@@ -302,13 +303,13 @@ contract Vault is IVault, Pausable, Ownable{
         return profit;
     }
 
-    function forceClosePendingPosition(address collection, uint256 positionId) public override onlyOwner {
+    function forceClosePendingPosition(address collection, uint256 positionId) public override onlyKeeper {
         OptionToken optionToken = OptionToken(_collections[collection].optionToken);
         _totalLockedAssets -= optionToken.lockedValue(positionId);
         uint256 strikeId = optionToken.optionPosition(positionId).strikeId;
         delete _strikes[strikeId];
         emit DestoryStrike(strikeId);
-        optionToken.forceClosePosition(positionId);
+        optionToken.forceClosePendingPosition(positionId);
     }
 
     function _calculateExerciseProfit(OptionType optionType, uint256 currentPrice, uint256 strikePrice, uint256 amount) internal view returns(uint256, uint256){
