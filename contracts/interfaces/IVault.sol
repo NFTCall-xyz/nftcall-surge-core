@@ -29,7 +29,10 @@ interface IVault {
     event ReceivePremium(address indexed user, uint256 amountToReserve, uint256 amountToLiquidityPool);
     event SendRevenue(address indexed receiver, uint256 amount, uint256 fee);
     event CreateMarket(address indexed collection, uint32 weight, address optionToken);
+    event KeeperAddressUpdated(address indexed keeperAddress);
 
+    function keeper() external view returns(address);
+    function setKeeper(address keeperAddress) external;
     function reserve() external view returns(address);
     function unrealizedPNL() external view returns(int256);
     function updateUnrealizedPNL() external returns(int256);

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: ISC
 pragma solidity 0.8.17;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -31,6 +31,7 @@ contract Vault is IVault, Pausable, Ownable{
     address private _riskCache;
     address private _pricer;
     address private _reserve;
+    address private _keeper;
     uint256 private _nextId = 1;    mapping(address => CollectionConfiguration) private _collections;
     mapping(uint256 => address) private _collectionsList;
     mapping(uint256 => Strike) private _strikes;
@@ -66,6 +67,22 @@ contract Vault is IVault, Pausable, Ownable{
         _pricer = pricer;
         _riskCache = riskCache;
         _reserve = reserve_;
+        _keeper = owner();
+    }
+
+    modifier onlyKeeper() {
+        if (msg.sender != _keeper) {
+            revert OnlyKeeper(address(this), msg.sender, _keeper);
+        }
+        _;
+    }
+
+    function keeper() public override view returns(address) {
+        return _keeper;
+    }
+
+    function setKeeper(address keeperAddress) public override onlyOwner {
+        _keeper = keeperAddress;
     }
 
     function reserve() public override view returns(address) {
