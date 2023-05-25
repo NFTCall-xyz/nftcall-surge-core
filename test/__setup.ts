@@ -11,6 +11,7 @@ import {
     deployRiskCache,
     deployVault,
     deployBlackScholes,
+    deployKeeperHelper,
     initializeLPToken,
     initializeOptionToken,
     initializeMarket
@@ -45,7 +46,8 @@ async function buildTestEnv() {
     await pricer.initialize(riskCache.address, oracle.address);
     await initializeOptionToken('BAYC');
     await initializeMarket('BAYC', bigNumber(50, 6-2));
-    
+    const keeperHelper = await deployKeeperHelper(vault.address);
+    await vault.setKeeper(keeperHelper.address);
     console.timeEnd('setup');
 }
 

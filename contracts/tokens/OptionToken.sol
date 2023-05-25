@@ -21,6 +21,7 @@ contract OptionToken is IOptionToken, ERC721Enumerable, Ownable, SimpleInitializ
     address private _vault;
     uint256 internal constant _decimals = DECIMALS;
     uint256 private _totalValue;
+    uint256 private _totalAmount;
     uint256 private _nextId = 1;
     string private _baseTokenURI;
 
@@ -84,6 +85,7 @@ contract OptionToken is IOptionToken, ERC721Enumerable, Ownable, SimpleInitializ
         }
         po.state = PositionState.ACTIVE;
         po.premium = premium;
+        _totalAmount += po.amount;
         emit ActivePosition(positionId, premium);
     }
 
@@ -92,6 +94,7 @@ contract OptionToken is IOptionToken, ERC721Enumerable, Ownable, SimpleInitializ
         if(_options[positionId].state != PositionState.ACTIVE) {
             revert IsNotActive(address(this), positionId, _options[positionId].state);
         }
+        _totalAmount -= _options[positionId].amount;
         _closePosition(positionId);
         emit ClosePosition(positionId);
     }
@@ -109,6 +112,10 @@ contract OptionToken is IOptionToken, ERC721Enumerable, Ownable, SimpleInitializ
         _totalValue -= lockedValue(positionId);
         delete _options[positionId];
         _burn(positionId);
+    }
+
+    function totalAmount() public override view returns(uint256) {
+        return _totalAmount;
     }
 
     function totalValue() public override view returns(uint256) 

@@ -5,6 +5,7 @@ import {
     deployPricer,
     deployRiskCache,
     deployReserve,
+    deployKeeperHelper,
     initializeLPToken,
     getAddress,
     getContract,
@@ -80,3 +81,13 @@ task('pricer:init', 'Initialize Pricer')
         if(!oracle) throw new Error(`Oracle not found`);
         await waitTx(await pricer.initialize(riskCache.address, oracle.address));
     });
+
+task('keeperHelper:init', 'Deploy KeeperHelper')
+    .addFlag('verify', 'Verify contract at Etherscan')
+    .setAction(async ({ verify }, hre) => {
+        await hre.run('set-DRE');
+        const vault = await getVault();
+        if(!vault) throw new Error('Vault not found');
+        await deployKeeperHelper(vault.address, verify);
+    })
+

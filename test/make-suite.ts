@@ -10,10 +10,12 @@ import {
     getPricer,
     getReserve,
     getRiskCache,
-    getVault
+    getVault,
+    getKeeperHelper,
 } from '../scripts/utils/contracts';
 import { 
     AssetRiskCache,
+    KeeperHelper,
     LPToken,
     NFTCallOracle, 
     OptionPricer, 
@@ -44,6 +46,7 @@ export interface TestEnv {
     pricer?: OptionPricer;
     riskCache?: AssetRiskCache;
     lpToken?: LPToken;
+    keeperHelper?: KeeperHelper;
     eth?: MintableERC20;
     markets: {[key:string]: Market};
 };
@@ -75,6 +78,7 @@ export const initializeMakeSuite = async () => {
     testEnv.pricer = await getPricer();
     testEnv.riskCache = await getRiskCache();
     testEnv.lpToken = await getLPToken();
+    testEnv.keeperHelper = await getKeeperHelper();
     testEnv.eth = await getMintableERC20('WETH');
     const baycAddress = await getAddress('BAYC');
     const baycOption = await getOptionToken('BAYC');

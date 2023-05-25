@@ -19,6 +19,8 @@ import {OptionToken} from "../tokens/OptionToken.sol";
 
 import "../interfaces/IVault.sol";
 
+import "hardhat/console.sol";
+
 contract Vault is IVault, Pausable, Ownable{
     using StorageSlot for bytes32;
     using PercentageMath for uint256;
@@ -251,9 +253,10 @@ contract Vault is IVault, Pausable, Ownable{
         //transfer premium from the caller to the vault
         uint256 amountToReserve = premium.percentMul(RESERVE_RATIO);
         _strikes[position.strikeId] = strike_;
-        emit ReceivePremium(msg.sender, amountToReserve, premium - amountToReserve);
-        IERC20(_asset).safeTransferFrom(msg.sender, _reserve, amountToReserve);
-        IERC20(_asset).safeTransferFrom(msg.sender, _lpToken, premium - amountToReserve);
+        address owner = optionToken.ownerOf(positionId);
+        emit ReceivePremium(owner, amountToReserve, premium - amountToReserve);
+        IERC20(_asset).safeTransferFrom(owner, _reserve, amountToReserve);
+        IERC20(_asset).safeTransferFrom(owner, _lpToken, premium - amountToReserve);
     }
 
     function closePosition(address collection, uint256 positionId) public override onlyKeeper returns(uint256 profit){

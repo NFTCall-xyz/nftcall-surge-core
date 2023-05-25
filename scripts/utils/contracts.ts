@@ -13,6 +13,7 @@ import {
     MintableERC20,
     MintableERC721,
     BlackScholes,
+    KeeperHelper,
 } from '../../types';
 
 function getKey(name: string, marketName?: string) {
@@ -144,6 +145,11 @@ export const deployBlackScholes = async (verify: boolean = false) => {
     return blackScholes;
 }
 
+export const deployKeeperHelper = async (vault: string, verify: boolean = false) => {
+    const keeperHelper = await deployContract<KeeperHelper>('KeeperHelper', [vault]);
+    return keeperHelper;
+}
+
 export const getVault = async () => {
     return await getContract<Vault>('Vault');
 }
@@ -190,6 +196,10 @@ export const getMintableERC721 = async (symbol: string) => {
 
 export const getBlackScholes = async() => {
     return await getContract<BlackScholes>('BlackScholes');
+}
+
+export const getKeeperHelper = async() => {
+    return await getContract<KeeperHelper>('KeeperHelper');
 }
 
 export const initializeLPToken = async(maximumTotalAssets: BigNumber) => {
