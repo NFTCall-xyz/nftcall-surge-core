@@ -119,10 +119,6 @@ contract Vault is IVault, Pausable, Ownable{
         LPToken(_lpToken).deposit(amount, msg.sender, onBehalfOf);
     }
 
-    function claimLPToken(address user) public override{
-        LPToken(_lpToken).claim(user);
-    }
-
     function withdraw(uint256 amount, address to) public override returns(uint256){
         return LPToken(_lpToken).withdraw(amount, to, msg.sender);
     }

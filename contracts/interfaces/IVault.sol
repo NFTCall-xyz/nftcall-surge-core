@@ -38,7 +38,6 @@ interface IVault {
     function updateUnrealizedPNL() external returns(int256);
     function unrealizedPremium() external view returns(uint256);
     function deposit(uint256 amount, address onBehalfOf) external;
-    function claimLPToken(address user) external;
     function withdraw(uint256 amount, address to) external returns(uint256);
     function totalAssets() external view returns(uint256);
     function totalLockedAssets() external view returns(uint256);

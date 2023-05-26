@@ -34,17 +34,18 @@ makeSuite('Vault', (testEnv) => {
           .withArgs(lpToken.address, amount, 0);
   })
 
-  it("Should not be able to claim", async() => {
-    const { deployer, lpToken} = testEnv;
-    if(lpToken == undefined || deployer == undefined) {
+  it("Should not be able to withdraw", async() => {
+    const { deployer, vault, lpToken} = testEnv;
+    if(lpToken == undefined || vault == undefined || deployer == undefined) {
       throw new Error('testEnv not initialized');
     }
     const releaseTime = await lpToken.releaseTime(deployer.address);
     const blockTimestamp = await time.latest() + 1;
     await time.setNextBlockTimestamp(blockTimestamp);
-    await expect(lpToken.claim(deployer.address))
-          .to.be.revertedWithCustomError(lpToken, "ClaimBeforeReleaseTime")
-          .withArgs(lpToken.address, deployer.address, releaseTime, blockTimestamp);
+    const amount = ethers.utils.parseEther('100');
+    await expect(vault.withdraw(amount, deployer.address))
+          .to.be.revertedWithCustomError(lpToken, "WithdrawMoreThanMax")
+          .withArgs(lpToken.address, amount, 0);
   })
 
   it("Should be able to withdraw", async () => {
@@ -60,7 +61,6 @@ makeSuite('Vault', (testEnv) => {
     await lpToken.approve(vault.address, amount);
     const releaseTime = await lpToken.releaseTime(deployer.address);
     await time.increaseTo(releaseTime.toNumber());
-    await vault.claimLPToken(deployer.address);
     await vault.withdraw(amount, deployer.address);
     const balance = await eth.balanceOf(deployer.address);
     expect(balance).to.be.equal(amount.sub(fee));

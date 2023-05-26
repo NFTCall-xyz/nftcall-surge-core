@@ -77,21 +77,15 @@ contract LPToken is ILPToken, ERC4626, Ownable, SimpleInitializable {
         return _lockedBalances[user].lockedBalance;
     }
 
-    function releaseTime(address user) public override view returns(uint256) {
-        return _lockedBalances[user].releaseTime;
+    function balanceOf(address user) public override(ERC20, IERC20) virtual view returns(uint256) {
+        if(block.timestamp >= _lockedBalances[user].releaseTime){
+            return super.balanceOf(user) + _lockedBalances[user].lockedBalance;
+        }
+        return super.balanceOf(user);
     }
 
-    function _claim(address user) internal returns(uint256 shares) {
-        if(block.timestamp < _lockedBalances[user].releaseTime){
-            return 0;
-        }
-        shares = _lockedBalances[user].lockedBalance;
-        if(shares > 0){
-            _lockedBalances[user].lockedBalance -= shares;
-            _totalLockedBalance -= shares;
-            _mint(user, shares);
-            emit Claim(user, shares);
-        }
+    function releaseTime(address user) public override view returns(uint256) {
+        return _lockedBalances[user].releaseTime;
     }
 
     function totalAssets() public view override returns (uint256) {
@@ -302,5 +296,32 @@ contract LPToken is ILPToken, ERC4626, Ownable, SimpleInitializable {
         Math.Rounding /*rounding*/
     ) internal pure override returns (uint256 assets) {
         return shares;
+    }
+
+    function _claim(address user) internal returns(uint256 shares) {
+        if(block.timestamp < _lockedBalances[user].releaseTime){
+            return 0;
+        }
+        shares = _lockedBalances[user].lockedBalance;
+        if(shares > 0){
+            _lockedBalances[user].lockedBalance -= shares;
+            _totalLockedBalance -= shares;
+            _mint(user, shares);
+            emit Claim(user, shares);
+        }
+    }
+
+     function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual override {
+        if (from != address(0)) { // transfer or burn
+            _claim(from);
+        }
+        else { // mint
+            _claim(to);
+        }
+        super._beforeTokenTransfer(from, to, amount);
     }
 }
