@@ -71,6 +71,9 @@ contract LPToken is ILPToken, ERC4626, Ownable, SimpleInitializable {
     }
 
     function lockedBalanceOf(address user) public override view returns(uint256) {
+        if(block.timestamp >= _lockedBalances[user].releaseTime){
+            return 0;
+        }
         return _lockedBalances[user].lockedBalance;
     }
 
@@ -78,9 +81,9 @@ contract LPToken is ILPToken, ERC4626, Ownable, SimpleInitializable {
         return _lockedBalances[user].releaseTime;
     }
 
-    function claim(address user) public override returns(uint256 shares) {
+    function _claim(address user) internal returns(uint256 shares) {
         if(block.timestamp < _lockedBalances[user].releaseTime){
-            revert ClaimBeforeReleaseTime(address(this), user, _lockedBalances[user].releaseTime, block.timestamp);
+            return 0;
         }
         shares = _lockedBalances[user].lockedBalance;
         if(shares > 0){

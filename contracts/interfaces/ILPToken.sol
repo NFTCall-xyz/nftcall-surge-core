@@ -11,7 +11,6 @@ interface ILPToken {
     function setMaximumVaultBalance(uint256 maxVaultBalance) external;
     function lockedBalanceOf(address user) external view returns(uint256);
     function releaseTime(address user) external view returns(uint256);
-    function claim(address user) external returns(uint256 shares);
     function setMinimumAssetToShareRatio(uint256 ratio) external;
     function deposit(uint256 assets, address user, address receiver) external returns(uint256);
 
