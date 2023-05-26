@@ -35,7 +35,7 @@ contract KeeperHelper is Ownable{
         return tokenIds;
     }
 
-    function getExpiredOption(address collection) external view returns (uint256[] memory tokenIds) {
+    function getExpiredOptions(address collection) external view returns (uint256[] memory tokenIds) {
         OptionToken optionToken = OptionToken(IVault(_vault).marketConfiguration(collection).optionToken);
         uint256 totalExpiredTokens = 0;
         uint256 currentTime = block.timestamp;
