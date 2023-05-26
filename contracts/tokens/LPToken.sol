@@ -84,8 +84,9 @@ contract LPToken is ILPToken, ERC4626, Ownable, SimpleInitializable {
         }
         shares = _lockedBalances[user].lockedBalance;
         if(shares > 0){
-            _mint(user, shares);
+            _lockedBalances[user].lockedBalance -= shares;
             _totalLockedBalance -= shares;
+            _mint(user, shares);
             emit Claim(user, shares);
         }
     }
