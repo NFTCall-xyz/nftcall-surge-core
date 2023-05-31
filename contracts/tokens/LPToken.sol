@@ -71,14 +71,14 @@ contract LPToken is ILPToken, ERC4626, Ownable, SimpleInitializable {
     }
 
     function lockedBalanceOf(address user) public override view returns(uint256) {
-        if(block.timestamp >= _lockedBalances[user].releaseTime){
+        if(_lockedBalances[user].releaseTime > 0 && block.timestamp >= _lockedBalances[user].releaseTime){
             return 0;
         }
         return _lockedBalances[user].lockedBalance;
     }
 
     function balanceOf(address user) public override(ERC20, IERC20) virtual view returns(uint256) {
-        if(block.timestamp >= _lockedBalances[user].releaseTime){
+        if(_lockedBalances[user].releaseTime > 0 && block.timestamp >= _lockedBalances[user].releaseTime){
             return super.balanceOf(user) + _lockedBalances[user].lockedBalance;
         }
         return super.balanceOf(user);
@@ -215,6 +215,7 @@ contract LPToken is ILPToken, ERC4626, Ownable, SimpleInitializable {
         // assets are transferred and before the shares are minted, which is a valid state.
         // slither-disable-next-line reentrancy-no-eth
         SafeERC20.safeTransferFrom(IERC20(asset()), caller, address(this), assets);
+        _claim(receiver);
         _lockedBalances[receiver].lockedBalance += shares;
         _totalLockedBalance +=  shares;
         _lockedBalances[receiver].releaseTime = block.timestamp + LOCK_PERIOD;
@@ -299,12 +300,13 @@ contract LPToken is ILPToken, ERC4626, Ownable, SimpleInitializable {
     }
 
     function _claim(address user) internal returns(uint256 shares) {
-        if(block.timestamp < _lockedBalances[user].releaseTime){
+        if(_lockedBalances[user].releaseTime > 0 && block.timestamp < _lockedBalances[user].releaseTime){
             return 0;
         }
         shares = _lockedBalances[user].lockedBalance;
         if(shares > 0){
             _lockedBalances[user].lockedBalance -= shares;
+            _lockedBalances[user].releaseTime = 0;
             _totalLockedBalance -= shares;
             _mint(user, shares);
             emit Claim(user, shares);

@@ -101,7 +101,7 @@ contract Vault is IVault, Pausable, Ownable{
         int256 newPNL = 0;
         for(uint256 i = 0; i < _collectionsCount; i++){
             address collection = _collectionsList[i];
-            CollectionConfiguration storage config = _collections[collection];
+            CollectionConfiguration memory config = _collections[collection];
             if(config.activated){
                 (,int256 PNL) = IAssetRiskCache(_riskCache).getAssetRisk(collection);
                 newPNL += PNL;
@@ -172,7 +172,7 @@ contract Vault is IVault, Pausable, Ownable{
     }
 
     function maximumOptionAmount(address collection, OptionType optionType) external view override returns(uint256 amount) {
-        CollectionConfiguration storage config = _collections[collection];
+        CollectionConfiguration memory config = _collections[collection];
         uint256 currentAmount = IERC20(_asset).balanceOf(_lpToken);
         uint256 totalLockedValue = OptionToken(config.optionToken).totalValue();
         uint256 maximumLockedValueOfCollection = _maximumLockedValueOfCollection(config, currentAmount);
