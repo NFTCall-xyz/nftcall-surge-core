@@ -58,7 +58,7 @@ contract Vault is IVault, Pausable, Ownable{
     uint256 public constant MINIMUM_PUT_STRIKE_PRICE_RATIO = PERCENTAGE_FACTOR * 50 / 100; // 50%
 
     uint256 public constant MINIMUM_DURATION = 3 days;
-    uint256 public constant MAXIMUM_DURATION = 28 days;
+    uint256 public constant MAXIMUM_DURATION = 30 days;
 
     constructor (address asset, address lpToken, address oracle, address pricer, address riskCache, address reserve_)
         Ownable()
