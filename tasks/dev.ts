@@ -109,7 +109,7 @@ task('dev:update', 'Deploy updated contracts')
         for (const [nft, market] of Object.entries(markets)) {
             await hre.run(
                 'optionToken:deploy', 
-                {nftSymbol: nft, nftName: market.name, baseURI: market.baseURI, market: nft});
+                {nftSymbol: nft, nftName: market.name, baseURI: market.baseURI, market: nft, verify: verify});
             console.log(`init optionToken ${nft}...`);
             await hre.run('optionToken:init', {market: nft});
             await hre.run('vault:initMarket', {market: nft, weight: market.weight.toString()});
