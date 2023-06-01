@@ -34,7 +34,7 @@
       "address": "0x39aB4Aabd99062FF3dE3487E0E9925cD294f4651"
     },
     "arbitrumGoerli": {
-      "address": "0x85E3FCe05eE614f39133fA685798354df9A7f85A"
+      "address": "0x7908F9bc1E9bdCD28f35a42f08Ba2D0925879477"
     }
   },
   "BlackScholes": {
@@ -45,7 +45,7 @@
       "address": "0x654113e5f95ebB9D1698E9C22e9665B2722Eaa44"
     },
     "arbitrumGoerli": {
-      "address": "0xaf505747bA600181a99a7Bbf15a35e487814cF4b"
+      "address": "0x7f13b2829a9Bb8c7742FF2b2bC5b6F8EB7369c7c"
     }
   },
   "OptionPricer": {
@@ -56,7 +56,7 @@
       "address": "0x571320756A0f2DBffE7747eB1e71A70322172331"
     },
     "arbitrumGoerli": {
-      "address": "0x4aB6929527820D950D7D32b98bd4e8199BD6E76b"
+      "address": "0x5d2e9A780f63471dF081D7712B19CeDe0Af79837"
     }
   },
   "AssetRiskCache": {
@@ -67,7 +67,7 @@
       "address": "0xb33C4d99394641B5A6f08018298fEc88c87a6BA0"
     },
     "arbitrumGoerli": {
-      "address": "0x762d4A8c49177a353262b3e36556e00eEF9DFa9F"
+      "address": "0x483Bc8ce8c1569814a94530F31B98D7e3314c636"
     }
   },
   "Reserve": {
@@ -78,7 +78,7 @@
       "address": "0x4a0C96b637adddBb5CCF2C0280A14429467ED215"
     },
     "arbitrumGoerli": {
-      "address": "0x07Ac244Ca40ffF62963f3000D2Ce255635EF9355"
+      "address": "0x048A4995263Cf06DDBafCbCf9c3De3462F1701b4"
     }
   },
   "Vault": {
@@ -89,7 +89,7 @@
       "address": "0xfBAdd629393258F2410242CA815E52280A9cf3e1"
     },
     "arbitrumGoerli": {
-      "address": "0x02b22FcAd7b08E7250DE8E411A56Cd40904252b1"
+      "address": "0x2A53adF8230591c883Fa468116a83926F3356cdC"
     }
   },
   "operator": {
@@ -124,7 +124,7 @@
       "address": "0x959922bE3CAee4b8Cd9a407cc3ac1C251C2007B1"
     },
     "arbitrumGoerli": {
-      "address": "0xF08c7037F5A61648Cb07D09ac914dB10095dD6e8"
+      "address": "0xf2b755e64F40cc897E6Ec61017b0779801848edb"
     }
   }
 }
