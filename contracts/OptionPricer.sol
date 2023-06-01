@@ -107,8 +107,6 @@ contract OptionPricer is IPricer, Ownable, SimpleInitializable {
       riskFreeRate * int(decimalsDiff)
     );
     (call, put) = BlackScholes.optionPrices(bsInput);
-    call /= decimalsDiff;
-    put /= decimalsDiff;
   }
 
   function delta(uint S, uint K, uint vol, uint duration) public view override returns (int callDelta, int putDelta) {

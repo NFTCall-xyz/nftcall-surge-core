@@ -184,7 +184,7 @@ makeSuite('Vault', (testEnv) => {
     expect(events).is.not.undefined;
     const openEvent = events[events.length - 1];
     const estimatedPremium = openEvent.args['estimatedPremium'];
-    expect(estimatedPremium).to.be.equal(BigNumber.from(778209).mul(150).add(50).div(100));
+    expect(estimatedPremium).to.be.equal(BigNumber.from("778209470375937403").mul(150).add(50).div(100));
     await eth.approve(vault.address, estimatedPremium);
   });
 
