@@ -41,7 +41,8 @@ interface IVault {
     function withdraw(uint256 amount, address to) external returns(uint256);
     function totalAssets() external view returns(uint256);
     function totalLockedAssets() external view returns(uint256);
-    function openPosition(address collection, address onBehalfOf, OptionType optionType, uint256 strikePrice, uint256 expiry, uint256 amount) external returns(uint256 positionId, uint256 premium);
+    function estimatePremium(address collection, OptionType optionType, uint256 strikePrice, uint256 expiry, uint256 amount) external view returns(uint256 premium);
+    function openPosition(address collection, address onBehalfOf, OptionType optionType, uint256 strikePrice, uint256 expiry, uint256 amount, uint256 maximumPremium) external returns(uint256 positionId, uint256 premium);
     function activePosition(address collection, uint256 positionId) external returns(uint256 premium);
     function closePosition(address collection, uint256 positionId) external returns(uint256);
     function forceClosePendingPosition(address collection, uint256 positionId) external;
@@ -57,6 +58,7 @@ interface IVault {
     error InsufficientLiquidityForCollection(address thrower, address collection, uint256 totalLockedAssets, uint256 amountToBeLocked, uint256 vaultLiquidity);
     error InsufficientLiquidity(address thrower, uint256 totalLockedAssets, uint256 amountToBeLocked, uint256 vaultLiquidity);
     error InvalidStrikeId(address thrower, uint256 strikeId);
+    error PremiumTooHigh(address thrower, uint256 positionId, uint256 premium, uint256 maximumPremium);
     error PremiumTransferFailed(address thrower, address sender, address receiver, uint256 premium);
     error PositionNotActive(address thrower, uint256 positionId, PositionState state);
     error PositionNotExpired(address thrower, uint256 positionId, uint256 expiry, uint256 blockTimestamp);

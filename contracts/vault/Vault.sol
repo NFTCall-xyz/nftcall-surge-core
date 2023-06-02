@@ -198,31 +198,46 @@ contract Vault is IVault, Pausable, Ownable{
     function _calculateStrikeAndPremium(address collection, OptionType optionType, Strike memory strike_) internal view returns(uint256 premium){
         IPricer pricer = IPricer(_pricer);
         uint256 adjustedVol = pricer.getAdjustedVol(collection, optionType, strike_.strikePrice);
-        premium = pricer.getPremium(optionType, strike_.spotPrice, strike_.strikePrice, adjustedVol, strike_.duration).percentMul(PREMIUM_UPSCALE_RATIO);
+        premium = pricer.getPremium(optionType, strike_.spotPrice, strike_.strikePrice, adjustedVol, strike_.duration);
     }
 
-    //for options
-    function openPosition(address collection, address onBehalfOf, OptionType optionType, uint256 strikePrice, uint256 expiry, uint256 amount) public override 
-        returns(uint256, uint256)
+    function _estimatePremium(address collection, OptionType optionType, uint256 strikePrice, uint256 expiry, uint256 amount) internal view 
+        returns(uint256 premium, Strike memory strike_)
     {
         if(amount == 0){
             revert ZeroAmount(address(this));
         }
         CollectionConfiguration memory config = _collections[collection];
-        Strike memory strike_;
         strike_.spotPrice = IOracle(_oracle).getAssetPrice(collection);
         strike_.strikePrice = strikePrice;
         strike_.expiry = expiry;
         strike_.duration = expiry - block.timestamp;
         _validateOpenOption1(amount, optionType, strike_);
-        uint256 premium = _calculateStrikeAndPremium(collection, optionType, strike_);
-        _validateOpenOption2(config, strike_.spotPrice.mulDiv(amount, UNIT, Math.Rounding.Up), premium.mulDiv(amount, UNIT, Math.Rounding.Up));
+        uint256 premium = _calculateStrikeAndPremium(collection, optionType, strike_).mulDiv(amount, UNIT, Math.Rounding.Up);
+        _validateOpenOption2(config, strike_.spotPrice.mulDiv(amount, UNIT, Math.Rounding.Up), premium);
+        return (premium, strike_);
+    }
+
+    function estimatePremium(address collection, OptionType optionType, uint256 strikePrice, uint256 expiry, uint256 amount) public view override 
+        returns(uint256 premium)
+    {
+        (premium, ) = _estimatePremium(collection, optionType, strikePrice, expiry, amount);
+        return premium;
+    }
+
+    //for options
+    function openPosition(address collection, address onBehalfOf, OptionType optionType, uint256 strikePrice, uint256 expiry, uint256 amount, uint256 maximumPremium) public override 
+        returns(uint256, uint256)
+    {
+        Strike memory strike_;
+        uint256 premium;
+        (premium, strike_) = _estimatePremium(collection, optionType, strikePrice, expiry, amount);
         uint256 strikeId = _nextId++;
         _strikes[strikeId] = strike_;
         emit CreateStrike(strikeId, strike_.duration, strike_.expiry, strike_.spotPrice, strike_.strikePrice);
         //mint option token
-        OptionToken optionToken = OptionToken(config.optionToken);
-        uint256 positionId = optionToken.openPosition(onBehalfOf, optionType, strikeId, amount);
+        OptionToken optionToken = OptionToken( _collections[collection].optionToken);
+        uint256 positionId = optionToken.openPosition(onBehalfOf, optionType, strikeId, amount, maximumPremium);
         _totalLockedAssets += optionToken.lockedValue(positionId);
         emit OpenPosition(collection, strikeId, positionId, premium);
         return (positionId, premium);
@@ -241,19 +256,19 @@ contract Vault is IVault, Pausable, Ownable{
         strike_.duration = strike_.expiry - block.timestamp;
         tradeParameters.expiry = strike_.expiry;
         strike_.spotPrice = IOracle(_oracle).getAssetPrice(collection);
-        IPricer pricer = IPricer(_pricer);
-        uint256 adjustedVol = pricer.getAdjustedVol(collection, position.optionType, strike_.strikePrice);
-        premium = pricer.getPremium(position.optionType, strike_.spotPrice, strike_.strikePrice, adjustedVol, strike_.duration);
-        uint256 totalPremium = premium.mulDiv(position.amount, UNIT, Math.Rounding.Up);
-        _unrealizedPremium += totalPremium;
+        premium = _calculateStrikeAndPremium(collection, position.optionType, strike_).mulDiv(position.amount, UNIT, Math.Rounding.Up);
+        if(premium > position.maximumPremium){
+            revert PremiumTooHigh(address(this), positionId, premium, position.maximumPremium);
+        }
+        _unrealizedPremium += premium;
         optionToken.activePosition(positionId, premium);
         //transfer premium from the caller to the vault
-        uint256 amountToReserve = totalPremium.percentMul(RESERVE_RATIO);
+        uint256 amountToReserve = premium.percentMul(RESERVE_RATIO);
         _strikes[position.strikeId] = strike_;
         address owner = optionToken.ownerOf(positionId);
-        emit ReceivePremium(owner, amountToReserve, totalPremium - amountToReserve);
+        emit ReceivePremium(owner, amountToReserve, premium - amountToReserve);
         IERC20(_asset).safeTransferFrom(owner, _reserve, amountToReserve);
-        IERC20(_asset).safeTransferFrom(owner, _lpToken, totalPremium - amountToReserve);
+        IERC20(_asset).safeTransferFrom(owner, _lpToken, premium - amountToReserve);
     }
 
     function closePosition(address collection, uint256 positionId) public override onlyKeeper returns(uint256 profit){

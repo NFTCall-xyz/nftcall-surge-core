@@ -174,6 +174,7 @@ makeSuite('Vault', (testEnv) => {
     const expiry = await time.latest() + 28 * 3600 * 24;
     const strikePrice = bigNumber(12, 19);
     const amount = bigNumber(5, 17);
+    const premium = (await vault.estimatePremium(nft, 0, strikePrice, expiry, amount)).mul(105).div(100);
     const openTxRec = await waitTx(
       await vault.openPosition(
         nft, 
@@ -181,13 +182,13 @@ makeSuite('Vault', (testEnv) => {
         0, 
         strikePrice, 
         expiry, 
-        amount));
+        amount, premium));
     const events = openTxRec.events;
     expect(events).is.not.undefined;
     const openEvent = events[events.length - 1];
     const estimatedPremium = openEvent.args['estimatedPremium'];
-    expect(estimatedPremium).to.be.equal(BigNumber.from("778209470375937403").mul(105).add(50).div(100));
-    await eth.approve(vault.address, estimatedPremium.mul(amount).div(bigNumber(1,18)));
+    expect(estimatedPremium).to.be.equal(BigNumber.from("778209470375937403").mul(amount).add(bigNumber(1,18)).sub(1).div(bigNumber(1, 18)));
+    await eth.approve(vault.address, premium);
   });
 
   it("Keeper should be able to active a position", async() => {

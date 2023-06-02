@@ -1,6 +1,6 @@
 import {getDb} from './db';
 import {DRE} from '../utils';
-import { getKeeperHelper, getAddress } from '../utils/contracts';
+import { getKeeperHelper, getAddress, getVault } from '../utils/contracts';
 
 export const getOptionData = async (market: string, tokenId: string) => {
     const db = await getDb();
@@ -9,13 +9,28 @@ export const getOptionData = async (market: string, tokenId: string) => {
 
 export const activateOptions = async (market: string) => {
     const keeperHelper = await getKeeperHelper();
+    const vault = await getVault();
     const nft = await getAddress(market);
-    if(keeperHelper === undefined) {
+    if(keeperHelper === undefined || vault === undefined) {
         throw Error('KeeperHelper is not deployed');
     }
     const positionIds = await keeperHelper.getPendingOptions(nft);
     console.log('👉 activating positionIds:', positionIds);
-    await keeperHelper.batchActivateOptions(nft, positionIds);
+    try {
+        await keeperHelper.batchActivateOptions(nft, positionIds);
+    } catch (error) {
+        let failedPositions = [];
+        for(const positionId of positionIds) {
+            try {
+                await vault.activePosition(nft, positionId);
+            }
+            catch (error) {
+                failedPositions.push(positionId);
+                console.log('👉 failed to activate positionId:', positionId);
+                console.log(error);
+            }
+        }
+    }
     console.log('PositionIds activated');
 }
 
