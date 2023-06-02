@@ -47,7 +47,6 @@ contract Vault is IVault, Pausable, Ownable{
     uint256 private constant RESERVE_RATIO = PERCENTAGE_FACTOR * 10 / 100; // 10%
     uint256 private FEE_RATIO =  PERCENTAGE_FACTOR * 5 / 1000; // 0.5%
     uint256 private MAXIMUM_FEE_RATIO = PERCENTAGE_FACTOR * 125 / 1000; // 12.5%
-    uint256 public constant PREMIUM_UPSCALE_RATIO = PERCENTAGE_FACTOR * 105 / 100; // 105%
     
     uint256 public constant MAXIMUM_LOCK_RATIO = PERCENTAGE_FACTOR * 95 / 100; // 95%
     uint256 private constant _decimals = DECIMALS;

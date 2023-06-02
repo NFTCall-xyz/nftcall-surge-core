@@ -206,4 +206,39 @@ makeSuite('Vault', (testEnv) => {
     state = await optionToken.optionPositionState(positionIds[0]);
     expect(state).to.be.equal(2); // ACTIVE
   });
+
+  it("Should be able to open a position on behalf of other user", async () => {
+    const { vault, keeperHelper, eth, lpToken, deployer, markets, users } = testEnv;
+    if(vault === undefined || lpToken === undefined || eth === undefined || deployer === undefined || keeperHelper === undefined || Object.keys(markets).length == 0 || Object.keys(users).length == 0){
+      throw new Error('testEnv not initialized');
+    }
+    const market = markets['BAYC'];
+    const nft = market.nft;
+    const optionToken = market.optionToken;
+    const expiry = await time.latest() + 28 * 3600 * 24;
+    const strikePrice = bigNumber(12, 19);
+    const amount = bigNumber(5, 17);
+    const premium = (await vault.estimatePremium(nft, 0, strikePrice, expiry, amount)).mul(105).div(100);
+    const receiver = users[0];
+    const openTxRec = await waitTx(
+      await vault.openPosition(
+        nft,
+        receiver.address,
+        0,
+        strikePrice,
+        expiry,
+        amount, premium));
+    const events = openTxRec.events;
+    expect(events).is.not.undefined;
+    const openEvent = events[events.length - 1];
+    const estimatedPremium = openEvent.args['estimatedPremium'];
+    expect(estimatedPremium).to.be.equal(BigNumber.from("778209470375937403").mul(amount).add(bigNumber(1,18)).sub(1).div(bigNumber(1, 18)));
+    await eth.approve(vault.address, premium);
+    const positionIds = await keeperHelper.getPendingOptions(nft);
+    let state = await optionToken.optionPositionState(positionIds[0]);
+    expect(state).to.be.equal(1); // PENDING
+    await keeperHelper.batchActivateOptions(nft, positionIds);
+    state = await optionToken.optionPositionState(positionIds[0]);
+    expect(state).to.be.equal(2); // ACTIVE
+  });
 });
