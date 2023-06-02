@@ -237,7 +237,7 @@ contract Vault is IVault, Pausable, Ownable{
         emit CreateStrike(strikeId, strike_.duration, strike_.expiry, strike_.spotPrice, strike_.strikePrice);
         //mint option token
         OptionToken optionToken = OptionToken( _collections[collection].optionToken);
-        uint256 positionId = optionToken.openPosition(onBehalfOf, optionType, strikeId, amount, maximumPremium);
+        uint256 positionId = optionToken.openPosition(_msgSender(), onBehalfOf, optionType, strikeId, amount, maximumPremium);
         _totalLockedAssets += optionToken.lockedValue(positionId);
         emit OpenPosition(collection, strikeId, positionId, premium);
         return (positionId, premium);
@@ -265,10 +265,10 @@ contract Vault is IVault, Pausable, Ownable{
         //transfer premium from the caller to the vault
         uint256 amountToReserve = premium.percentMul(RESERVE_RATIO);
         _strikes[position.strikeId] = strike_;
-        address owner = optionToken.ownerOf(positionId);
-        emit ReceivePremium(owner, amountToReserve, premium - amountToReserve);
-        IERC20(_asset).safeTransferFrom(owner, _reserve, amountToReserve);
-        IERC20(_asset).safeTransferFrom(owner, _lpToken, premium - amountToReserve);
+        address payer = position.payer;
+        emit ReceivePremium(payer, amountToReserve, premium - amountToReserve);
+        IERC20(_asset).safeTransferFrom(payer, _reserve, amountToReserve);
+        IERC20(_asset).safeTransferFrom(payer, _lpToken, premium - amountToReserve);
     }
 
     function closePosition(address collection, uint256 positionId) public override onlyKeeper returns(uint256 profit){
