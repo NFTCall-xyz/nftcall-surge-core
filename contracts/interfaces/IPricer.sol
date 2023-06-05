@@ -8,4 +8,6 @@ interface IPricer {
     function getPremium(OptionType optionType, uint S, uint K, uint vol, uint duration) external view returns (uint premium);
     function optionPrices(uint S, uint K, uint vol, uint duration) external view returns (uint call, uint put);
     function delta(uint S, uint K, uint vol, uint druation) external view returns (int callDelta, int putDelta);
+
+    error IllegalStrikePrice(address thrower, uint S, uint K);
 }

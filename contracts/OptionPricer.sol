@@ -74,11 +74,15 @@ contract OptionPricer is IPricer, Ownable, SimpleInitializable {
     // Impact of skew, delta, and unrealized PNL
     int adjustedVol = int(vol);
     if (ot == OptionType.LONG_CALL) {
-      require(K > S, "Illegal strike price for CALL");
+      if (K <= S) {
+        revert IllegalStrikePrice(msg.sender, S, K);
+      }
       adjustedVol += int(vol*(K-S)*pricerParams.skewP1/S/(GENERAL_UNIT) + vol*(K-S)*(K-S)*pricerParams.skewP2/S/S/(GENERAL_UNIT));
       adjustedVol -= adjustedVol * delta * int(delta <= 0 ? pricerParams.deltaP1 : pricerParams.deltaP2) / int(GENERAL_UNIT**2);
     } else {
-      require(K < S, "Illegal strike price for PUT");
+      if (K >= S) {
+        revert IllegalStrikePrice(msg.sender, S, K);
+      }
       uint rK = S * S / K;
       adjustedVol += int(vol*(rK-S)*pricerParams.skewP1/S/(GENERAL_UNIT) + vol*(rK-S)*(rK-S)*pricerParams.skewP2/S/S/(GENERAL_UNIT));
       adjustedVol += adjustedVol * delta * int(delta >= 0 ? pricerParams.deltaP1 : pricerParams.deltaP2) / int(GENERAL_UNIT**2);
