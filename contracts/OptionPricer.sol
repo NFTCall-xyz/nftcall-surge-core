@@ -6,23 +6,23 @@ import {SignedDecimalMath} from "./synthetix/SignedDecimalMath.sol";
 import {DecimalMath} from "./synthetix/DecimalMath.sol";
 import {BlackScholes} from "./libraries/BlackScholes.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 // Inherited
-import "./libraries/SimpleInitializable.sol";
-import "./libraries/Math.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {SimpleInitializable} from "./libraries/SimpleInitializable.sol";
+import {IPricer} from "./interfaces/IPricer.sol";
 
 // Interfaces
-import "./AssetRiskCache.sol";
-import "./NFTCallOracle.sol";
-import "./interfaces/IOracle.sol";
-import "./interfaces/IAssetRiskCache.sol";
+import {IVault} from "./interfaces/IVault.sol";
+import {IOracle} from "./interfaces/IOracle.sol";
+import {IAssetRiskCache} from "./interfaces/IAssetRiskCache.sol";
+
+import {Vault} from "./vault/Vault.sol";
+import {AssetRiskCache} from "./AssetRiskCache.sol";
+import {NFTCallOracle} from "./NFTCallOracle.sol";
 import {OptionType} from "./interfaces/IOptionToken.sol";
 import {GENERAL_DECIMALS, GENERAL_UNIT } from "./libraries/DataTypes.sol";
-import { PERCENTAGE_FACTOR } from "./libraries/math/PercentageMath.sol";
-
-
-import "./interfaces/IPricer.sol";
+import {PERCENTAGE_FACTOR, HALF_PERCENT, PercentageMath} from "./libraries/math/PercentageMath.sol";
 
 import "hardhat/console.sol";
 
@@ -49,13 +49,15 @@ contract OptionPricer is IPricer, Ownable, SimpleInitializable {
     uint deltaP2;
   }
 
+  Vault internal vault;
   AssetRiskCache internal risk;
   NFTCallOracle internal oracle;
   PricerParams private pricerParams;
   // riskFreeRate is ETH POS interest rate, now annually 4.8%.
   int private riskFreeRate = int(PERCENTAGE_FACTOR * 48 / 1000);
 
-  function initialize(address riskCache_, address oracle_) public onlyOwner initializer {
+  function initialize(address vault_, address riskCache_, address oracle_) public onlyOwner initializer {
+    vault = Vault(vault_);
     risk = AssetRiskCache(riskCache_);
     oracle = NFTCallOracle(oracle_);
     pricerParams.skewP1 = GENERAL_UNIT * 10 / 100; // 0.1
@@ -87,7 +89,11 @@ contract OptionPricer is IPricer, Ownable, SimpleInitializable {
       adjustedVol += int(vol*(rK-S)*pricerParams.skewP1/S/(GENERAL_UNIT) + vol*(rK-S)*(rK-S)*pricerParams.skewP2/S/S/(GENERAL_UNIT));
       adjustedVol += adjustedVol * delta * int(delta >= 0 ? pricerParams.deltaP1 : pricerParams.deltaP2) / int(GENERAL_UNIT**2);
     }
-    // Collateral and amount impact
+    // Impact of collateralization ratio
+    uint cr = IVault(vault).totalLockedAssets() * PERCENTAGE_FACTOR / IVault(vault).totalAssets();
+    if (cr > HALF_PERCENT) {
+      adjustedVol += adjustedVol * int(cr - HALF_PERCENT) / int(PERCENTAGE_FACTOR);
+    }
     return uint(adjustedVol);
   }
 
