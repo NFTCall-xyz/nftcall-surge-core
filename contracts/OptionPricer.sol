@@ -21,7 +21,7 @@ import {Vault} from "./vault/Vault.sol";
 import {AssetRiskCache} from "./AssetRiskCache.sol";
 import {NFTCallOracle} from "./NFTCallOracle.sol";
 import {OptionType} from "./interfaces/IOptionToken.sol";
-import {GENERAL_DECIMALS, GENERAL_UNIT } from "./libraries/DataTypes.sol";
+import {GENERAL_DECIMALS, GENERAL_UNIT, UNIT } from "./libraries/DataTypes.sol";
 import {PERCENTAGE_FACTOR, HALF_PERCENT, PercentageMath} from "./libraries/math/PercentageMath.sol";
 
 import "hardhat/console.sol";
@@ -80,14 +80,14 @@ contract OptionPricer is IPricer, Ownable, SimpleInitializable {
         revert IllegalStrikePrice(msg.sender, S, K);
       }
       adjustedVol += int(vol*(K-S)*pricerParams.skewP1/S/(GENERAL_UNIT) + vol*(K-S)*(K-S)*pricerParams.skewP2/S/S/(GENERAL_UNIT));
-      adjustedVol -= adjustedVol * delta * int(delta <= 0 ? pricerParams.deltaP1 : pricerParams.deltaP2) / int(GENERAL_UNIT**2);
+      adjustedVol -= adjustedVol * delta * int(delta <= 0 ? pricerParams.deltaP1 : pricerParams.deltaP2) / int(GENERAL_UNIT) / UNIT;
     } else {
       if (K >= S) {
         revert IllegalStrikePrice(msg.sender, S, K);
       }
       uint rK = S * S / K;
       adjustedVol += int(vol*(rK-S)*pricerParams.skewP1/S/(GENERAL_UNIT) + vol*(rK-S)*(rK-S)*pricerParams.skewP2/S/S/(GENERAL_UNIT));
-      adjustedVol += adjustedVol * delta * int(delta >= 0 ? pricerParams.deltaP1 : pricerParams.deltaP2) / int(GENERAL_UNIT**2);
+      adjustedVol += adjustedVol * delta * int(delta >= 0 ? pricerParams.deltaP1 : pricerParams.deltaP2) / int(GENERAL_UNIT) / UNIT;
     }
     // Impact of collateralization ratio
     uint cr = IVault(vault).totalLockedAssets() * PERCENTAGE_FACTOR / IVault(vault).totalAssets();
