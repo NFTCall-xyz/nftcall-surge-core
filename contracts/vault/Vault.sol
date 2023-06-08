@@ -7,7 +7,7 @@ import {Pausable} from "@openzeppelin/contracts/security/Pausable.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {StorageSlot} from "@openzeppelin/contracts/utils/StorageSlot.sol";
-import {DECIMALS, UNIT} from "../libraries/DataTypes.sol";
+import {DECIMALS, UNIT, HIGH_PRECISION_UNIT} from "../libraries/DataTypes.sol";
 import {PERCENTAGE_FACTOR, PercentageMath} from "../libraries/math/PercentageMath.sol";
 import {LPToken} from "../tokens/LPToken.sol";
 import {OptionType, OptionPosition, PositionState, IOptionToken} from "../interfaces/IOptionToken.sol";
@@ -27,12 +27,14 @@ contract Vault is IVault, Pausable, Ownable{
     using Math for uint256;
     using SafeERC20 for IERC20;
 
+    bool private _paused;
     address private _asset;
     address private _lpToken;
     address private _oracle;
     address private _riskCache;
     address private _pricer;
     address private _reserve;
+    address private _backStopPool;
     address private _keeper;
     uint256 private _nextId = 1;    mapping(address => CollectionConfiguration) private _collections;
     mapping(uint256 => address) private _collectionsList;
@@ -47,7 +49,7 @@ contract Vault is IVault, Pausable, Ownable{
     uint256 private constant RESERVE_RATIO = PERCENTAGE_FACTOR * 10 / 100; // 10%
     uint256 private FEE_RATIO =  PERCENTAGE_FACTOR * 5 / 1000; // 0.5%
     uint256 private MAXIMUM_FEE_RATIO = PERCENTAGE_FACTOR * 125 / 1000; // 12.5%
-    
+        
     uint256 public constant MAXIMUM_LOCK_RATIO = PERCENTAGE_FACTOR * 95 / 100; // 95%
     uint256 private constant _decimals = DECIMALS;
 
@@ -55,11 +57,12 @@ contract Vault is IVault, Pausable, Ownable{
     uint256 public constant MINIMUM_CALL_STRIKE_PRICE_RATIO = PERCENTAGE_FACTOR * 110 / 100; // 110%
     uint256 public constant MAXIMUM_PUT_STRIKE_PRICE_RATIO = PERCENTAGE_FACTOR * 90 / 100; // 90%
     uint256 public constant MINIMUM_PUT_STRIKE_PRICE_RATIO = PERCENTAGE_FACTOR * 50 / 100; // 50%
+    uint256 public constant KEEPER_FEE = 5 * 10**13; // 0.00005 ETH
 
     uint256 public constant MINIMUM_DURATION = 3 days;
     uint256 public constant MAXIMUM_DURATION = 30 days;
 
-    constructor (address asset, address lpToken, address oracle, address pricer, address riskCache, address reserve_)
+    constructor (address asset, address lpToken, address oracle, address pricer, address riskCache, address reserve_, address backStopPool_)
         Ownable()
     {
         _asset = asset;
@@ -68,12 +71,20 @@ contract Vault is IVault, Pausable, Ownable{
         _pricer = pricer;
         _riskCache = riskCache;
         _reserve = reserve_;
+        _backStopPool = backStopPool_;
         _keeper = owner();
     }
 
     modifier onlyKeeper() {
         if (msg.sender != _keeper) {
             revert OnlyKeeper(address(this), msg.sender, _keeper);
+        }
+        _;
+    }
+
+    modifier onlyUnpaused() {
+        if (_paused) {
+            revert OnlyUnpaused(address(this), msg.sender);
         }
         _;
     }
@@ -88,6 +99,52 @@ contract Vault is IVault, Pausable, Ownable{
 
     function reserve() public override view returns(address) {
         return _reserve;
+    }
+
+    function backStopPool() public override view returns(address) {
+        return _backStopPool;
+    }
+
+    function pause() public override onlyOwner {
+        _paused = true;
+        emit Paused(msg.sender);
+    }
+
+    function unpause() public override onlyOwner {
+        _paused = false;
+        emit Unpaused(msg.sender);
+    }
+
+    function isPaused() public override view returns(bool) {
+        return _paused;
+    }
+
+    function activateMarket(address collection) public override onlyOwner {
+        _collections[collection].activated = true;
+        emit ActivateMarket(msg.sender, collection);
+    }
+
+    function deactivateMarket(address collection) public override onlyOwner {
+        _collections[collection].activated = false;
+        emit DeactivateMarket(msg.sender, collection);
+    }
+
+    function isActiveMarket(address collection) public override view returns(bool) {
+        return _collections[collection].activated;
+    }
+
+    function freezeMarket(address collection) public override onlyOwner {
+        _collections[collection].frozen = true;
+        emit FreezeMarket(msg.sender, collection);
+    }
+
+    function defreezeMarket(address collection) public override onlyOwner {
+        _collections[collection].frozen = false;
+        emit DefreezeMarket(msg.sender, collection);
+    }
+
+    function isFrozenMarket(address collection) public override view returns(bool) {
+        return _collections[collection].frozen;
     }
 
     function unrealizedPNL() public override view returns(int256) {
@@ -107,6 +164,8 @@ contract Vault is IVault, Pausable, Ownable{
             }
         }
         _unrealizedPNL = newPNL;
+        uint256 price = LPToken(_lpToken).convertToAssets(HIGH_PRECISION_UNIT);
+        emit UpdateLPTokenPrice(_lpToken, price);
         return newPNL;
     }
 
@@ -114,11 +173,11 @@ contract Vault is IVault, Pausable, Ownable{
         return _unrealizedPremium;
     }
 
-    function deposit(uint256 amount, address onBehalfOf) public override{
+    function deposit(uint256 amount, address onBehalfOf) public override onlyUnpaused{
         LPToken(_lpToken).deposit(amount, msg.sender, onBehalfOf);
     }
 
-    function withdraw(uint256 amount, address to) public override returns(uint256){
+    function withdraw(uint256 amount, address to) public override onlyUnpaused returns(uint256){
         return LPToken(_lpToken).withdraw(amount, to, msg.sender);
     }
 
@@ -225,24 +284,36 @@ contract Vault is IVault, Pausable, Ownable{
     }
 
     //for options
-    function openPosition(address collection, address onBehalfOf, OptionType optionType, uint256 strikePrice, uint256 expiry, uint256 amount, uint256 maximumPremium) public override 
-        returns(uint256, uint256)
+    function openPosition(address collection, address onBehalfOf, OptionType optionType, uint256 strikePrice, uint256 expiry, uint256 amount, uint256 maximumPremium) 
+        public override onlyUnpaused
+        returns(uint256 positionId, uint256 premium)
     {
+        if(_collections[collection].frozen){
+            revert FrozenMarket(address(this), collection);
+        }
+        if(!_collections[collection].activated){
+            revert DeactivatedMarket(address(this), collection);
+        }
         Strike memory strike_;
-        uint256 premium;
         (premium, strike_) = _estimatePremium(collection, optionType, strikePrice, expiry, amount);
         uint256 strikeId = _nextId++;
         _strikes[strikeId] = strike_;
         emit CreateStrike(strikeId, strike_.duration, strike_.expiry, strike_.spotPrice, strike_.strikePrice);
         //mint option token
         OptionToken optionToken = OptionToken( _collections[collection].optionToken);
-        uint256 positionId = optionToken.openPosition(_msgSender(), onBehalfOf, optionType, strikeId, amount, maximumPremium);
+        positionId = optionToken.openPosition(_msgSender(), onBehalfOf, optionType, strikeId, amount, maximumPremium);
         _totalLockedAssets += optionToken.lockedValue(positionId);
         emit OpenPosition(collection, strikeId, positionId, premium);
         return (positionId, premium);
     }
 
-    function activePosition(address collection, uint256 positionId) public override onlyKeeper returns(uint256 premium){
+    function activePosition(address collection, uint256 positionId) public override onlyKeeper onlyUnpaused returns(uint256 premium){
+        if(_collections[collection].frozen){
+            revert FrozenMarket(address(this), collection);
+        }
+        if(!_collections[collection].activated){
+            revert DeactivatedMarket(address(this), collection);
+        }
         OptionToken optionToken = OptionToken(_collections[collection].optionToken);
         OptionPosition memory position = optionToken.optionPosition(positionId);
         Strike memory strike_ = _strikes[position.strikeId];
@@ -266,14 +337,18 @@ contract Vault is IVault, Pausable, Ownable{
         _strikes[position.strikeId] = strike_;
         address payer = position.payer;
         emit ReceivePremium(payer, amountToReserve, premium - amountToReserve);
-        IERC20(_asset).safeTransferFrom(payer, _reserve, amountToReserve);
+        emit ReceiveKeeperFee(payer, KEEPER_FEE);
+        IERC20(_asset).safeTransferFrom(payer, _reserve, amountToReserve + KEEPER_FEE);
         IERC20(_asset).safeTransferFrom(payer, _lpToken, premium - amountToReserve);
     }
 
-    function closePosition(address collection, uint256 positionId) public override onlyKeeper returns(uint256 profit){
+    function closePosition(address collection, uint256 positionId) public override onlyKeeper onlyUnpaused returns(uint256 profit){
         //calculate fee
         //burn callOption token
         //transfer revenue from the vault to caller
+        if(_collections[collection].frozen){
+            revert FrozenMarket(address(this), collection);
+        }
         OptionToken optionToken = OptionToken(_collections[collection].optionToken);
         OptionPosition memory position = optionToken.optionPosition(positionId);
         
@@ -310,14 +385,19 @@ contract Vault is IVault, Pausable, Ownable{
         if(profit != 0){
             address to = optionToken.ownerOf(positionId);
             _realizedPNL -= int256(profit + fee);
-            IERC20(_asset).safeTransferFrom(_lpToken, _reserve, fee);
+            IERC20(_asset).safeTransferFrom(_lpToken, _backStopPool, fee);
             IERC20(_asset).safeTransferFrom(_lpToken, to, profit);
             emit SendRevenue(to, profit, fee);
         }
+        uint256 price = LPToken(_lpToken).convertToAssets(HIGH_PRECISION_UNIT);
+        emit UpdateLPTokenPrice(_lpToken, price);
         return profit;
     }
 
-    function forceClosePendingPosition(address collection, uint256 positionId) public override onlyKeeper {
+    function forceClosePendingPosition(address collection, uint256 positionId) public override onlyUnpaused onlyKeeper {
+        if(_collections[collection].frozen){
+            revert FrozenMarket(address(this), collection);
+        }
         OptionToken optionToken = OptionToken(_collections[collection].optionToken);
         _totalLockedAssets -= optionToken.lockedValue(positionId);
         uint256 strikeId = optionToken.optionPosition(positionId).strikeId;

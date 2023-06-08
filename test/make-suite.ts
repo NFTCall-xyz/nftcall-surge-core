@@ -9,6 +9,7 @@ import {
     getOracle,
     getPricer,
     getReserve,
+    getBackStopPool,
     getRiskCache,
     getVault,
     getKeeperHelper,
@@ -22,7 +23,8 @@ import {
     Vault, 
     MintableERC20, 
     OptionToken,
-    Reserve
+    Reserve,
+    BackStopPool
 } from '../types';
 
 let buidlerevmSnapshotId = '0x1';
@@ -42,6 +44,7 @@ export interface TestEnv {
     users: SignerWithAddress[];
     vault?: Vault;
     reserve?: Reserve;
+    backStopPool?: BackStopPool;
     oracle?: NFTCallOracle;
     pricer?: OptionPricer;
     riskCache?: AssetRiskCache;
@@ -75,6 +78,7 @@ export const initializeMakeSuite = async () => {
     testEnv.oracle = await getOracle();
     testEnv.vault = await getVault();
     testEnv.reserve = await getReserve();
+    testEnv.backStopPool = await getBackStopPool();
     testEnv.pricer = await getPricer();
     testEnv.riskCache = await getRiskCache();
     testEnv.lpToken = await getLPToken();

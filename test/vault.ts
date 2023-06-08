@@ -187,8 +187,9 @@ makeSuite('Vault', (testEnv) => {
     expect(events).is.not.undefined;
     const openEvent = events[events.length - 1];
     const estimatedPremium = openEvent.args['estimatedPremium'];
+    const keeperFee = await vault.KEEPER_FEE();
     expect(estimatedPremium).to.be.equal(BigNumber.from("778209470375937403").mul(amount).add(bigNumber(1,18)).sub(1).div(bigNumber(1, 18)));
-    await eth.approve(vault.address, premium);
+    await eth.approve(vault.address, premium.add(keeperFee));
   });
 
   it("Keeper should be able to active a position", async() => {

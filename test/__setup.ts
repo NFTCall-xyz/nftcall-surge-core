@@ -14,7 +14,8 @@ import {
     deployKeeperHelper,
     initializeLPToken,
     initializeOptionToken,
-    initializeMarket
+    initializeMarket,
+    deployBackStopPool
 } from '../scripts/utils/contracts';
 import {
     initializeMakeSuite,
@@ -36,7 +37,8 @@ async function buildTestEnv() {
     const pricer = await deployPricer();
     const riskCache = await deployRiskCache();
     const reserve = await deployReserve();
-    const vault = await deployVault(erc20.address, lpToken.address, oracle.address, pricer.address, riskCache.address, reserve.address);
+    const backStopPool = await deployBackStopPool();
+    const vault = await deployVault(erc20.address, lpToken.address, oracle.address, pricer.address, riskCache.address, reserve.address, backStopPool.address);
     await initializeLPToken(bigNumber(1000000, 18));
     const optionToken = await deployOptionToken(nft.address, "NFTCall BAYC Options Token", "ncBAYC", "https://bayc.finance/", "BAYC");
     await oracle.addAssets([nft.address]);

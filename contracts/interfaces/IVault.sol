@@ -16,7 +16,7 @@ struct Strike {
 
 interface IVault {
     struct CollectionConfiguration {
-        bool paused;
+        bool frozen;
         bool activated;
         uint32 id;
         uint32 weight; // percentage: 1000000 means 100%
@@ -27,13 +27,22 @@ interface IVault {
     event DestoryStrike(uint256 indexed strikeId);
     event OpenPosition(address indexed collection, uint256 indexed strikeId, uint256 indexed positionId, uint256 estimatedPremium);
     event ReceivePremium(address indexed user, uint256 amountToReserve, uint256 amountToLiquidityPool);
+    event ReceiveKeeperFee(address indexed user, uint256 amount);
     event SendRevenue(address indexed receiver, uint256 amount, uint256 fee);
     event CreateMarket(address indexed collection, uint32 weight, address optionToken);
     event KeeperAddressUpdated(address indexed keeperAddress);
+    event UpdateLPTokenPrice(address indexed lpToken, uint256 newPrice);
+    event PauseVault(address indexed operator);
+    event UnpauseVault(address indexed operator);
+    event FreezeMarket(address indexed operator, address indexed collection);
+    event DefreezeMarket(address indexed operator, address indexed collection);
+    event ActivateMarket(address indexed operator, address indexed collection);
+    event DeactivateMarket(address indexed operator, address indexed collection);
 
     function keeper() external view returns(address);
     function setKeeper(address keeperAddress) external;
     function reserve() external view returns(address);
+    function backStopPool() external view returns(address);
     function unrealizedPNL() external view returns(int256);
     function updateUnrealizedPNL() external returns(int256);
     function unrealizedPremium() external view returns(uint256);
@@ -51,6 +60,15 @@ interface IVault {
     function markets() external view returns(address[] memory);
     function marketConfiguration(address collection) external view returns(CollectionConfiguration memory);
     function maximumOptionAmount(address collection, OptionType optionType) external view returns(uint256);
+    function pause() external;
+    function unpause() external;
+    function isPaused() external view returns(bool);
+    function freezeMarket(address collection) external;
+    function defreezeMarket(address collection) external;
+    function isFrozenMarket(address collection) external view returns(bool);
+    function activateMarket(address collection) external;
+    function deactivateMarket(address collection) external;
+    function isActiveMarket(address collection) external view returns(bool);
 
     error ZeroAmount(address thrower);
     error InvalidStrikePrice(address thrower, uint strikePrice, uint spotPrice);
@@ -65,5 +83,8 @@ interface IVault {
     error RevenueTransferFailed(address thrower, address receiver, uint256 revenue);
     error CollectionAlreadyExists(address thrower, address collection);
     error OnlyKeeper(address thrower, address caller, address keeper);
+    error OnlyUnpaused(address thrower, address caller);
+    error FrozenMarket(address thrower, address collection);
+    error DeactivatedMarket(address thrower, address collection);
 }
 
