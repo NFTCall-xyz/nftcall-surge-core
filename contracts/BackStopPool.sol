@@ -19,5 +19,4 @@ contract BackStopPool is Ownable {
         require(amount <= IERC20(token).balanceOf(address(this)), "BackStopPool: amount exceeds balance");
         IERC20(token).safeTransfer(to, amount);
     }
-
 }

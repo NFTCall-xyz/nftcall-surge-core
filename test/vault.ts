@@ -242,4 +242,26 @@ makeSuite('Vault', (testEnv) => {
     state = await optionToken.optionPositionState(positionIds[0]);
     expect(state).to.be.equal(2); // ACTIVE
   });
+
+  it("Should be able to close a position", async() => {
+    const { vault, keeperHelper, deployer, markets } = testEnv;
+    if(vault === undefined || keeperHelper === undefined || deployer === undefined || Object.keys(markets).length == 0) {
+      throw new Error('testEnv not initialized');
+    }
+    const market = markets['BAYC'];
+    const nft = market.nft;
+    const optionToken = market.optionToken;
+    const positionIds = await keeperHelper.getActiveOptions(nft);
+    console.log(positionIds);
+    let state = await optionToken.optionPositionState(positionIds[0]);
+    expect(state).to.be.equal(2); // PENDING
+    let strikeId = (await optionToken.optionPosition(positionIds[0])).strikeId;
+    console.log(`strikeId: ${strikeId}`);
+    let expiry = (await vault.strike(strikeId)).expiry;
+    console.log(`${positionIds[0]} expired at ${expiry}`);
+    await time.increaseTo(expiry);
+    const expiredPositions = await keeperHelper.getExpiredOptions(nft);
+    console.log(expiredPositions);
+    await keeperHelper.batchCloseOptions(nft, expiredPositions);
+  });
 });
