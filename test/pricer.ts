@@ -1,16 +1,14 @@
-const { expect } = require("chai");
-const { ethers } = require("hardhat");
+import { makeSuite } from './make-suite';
+import { expect } from "chai";
+import { ethers } from "hardhat";
 
-describe("OptionPricer", function () {
-  let optionPricer;
-
-  beforeEach(async function () {
-    const OptionPricer = await ethers.getContractFactory("OptionPricer");
-    optionPricer = await OptionPricer.deploy();
-    await optionPricer.deployed();
-  });
+makeSuite("OptionPricer", function (testEnv) {
 
   it("should calculate the price of an option", async function () {
+    const {pricer } = testEnv;
+    if(pricer === undefined){
+      throw new Error('testEnv not initialized');
+    }
     // Set up test inputs
     const underlyingPrice = ethers.utils.parseEther("100");
     const strikePrice = ethers.utils.parseEther("110");
@@ -20,16 +18,15 @@ describe("OptionPricer", function () {
     const amount = ethers.utils.parseEther("1");
 
     // Call the price function
-    const price = await optionPricer.price(
+    const prices = await pricer.optionPrices(
       underlyingPrice,
       strikePrice,
-      timeToExpiry,
       volatility,
-      isPutOption,
-      amount
+      timeToExpiry,
     );
 
     // Check that the price is correct
-    expect(price).to.be.gt(0);
+    expect(prices.call).to.be.gt(0);
+    expect(prices.put).to.be.gt(0);
   });
 });

@@ -81,13 +81,15 @@ task('lpToken:init', 'Initialize LP Token')
 task('pricer:init', 'Initialize Pricer')
     .setAction(async ({ }, hre) => {
         await hre.run('set-DRE');
+        const vault = await getVault();
+        if(!vault) throw new Error(`Vault not found`);
         const pricer = await getPricer();
         if(!pricer) throw new Error(`Pricer not found`);
         const riskCache = await getRiskCache();
         if(!riskCache) throw new Error(`Risk Cache not found`);
         const oracle = await getOracle();
         if(!oracle) throw new Error(`Oracle not found`);
-        await waitTx(await pricer.initialize(riskCache.address, oracle.address));
+        await waitTx(await pricer.initialize(vault.address, riskCache.address, oracle.address));
     });
 
 task('keeperHelper:deploy', 'Deploy KeeperHelper')

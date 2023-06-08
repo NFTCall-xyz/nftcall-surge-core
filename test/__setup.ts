@@ -45,7 +45,7 @@ async function buildTestEnv() {
     await oracle.setOperator(operator.address);
     const [outerIndex, innerIndex] = await oracle.getIndexes(nft.address);
     await oracle.connect(operator).batchSetAssetPrice([outerIndex], [[{index: innerIndex, price: bigNumber(100, 2), vol: bigNumber(5, 2)}]]);
-    await pricer.initialize(riskCache.address, oracle.address);
+    await pricer.initialize(vault.address, riskCache.address, oracle.address);
     await initializeOptionToken('BAYC');
     await initializeMarket('BAYC', bigNumber(50, 6-2));
     const keeperHelper = await deployKeeperHelper(vault.address);
