@@ -7,8 +7,7 @@ import {Pausable} from "@openzeppelin/contracts/security/Pausable.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {StorageSlot} from "@openzeppelin/contracts/utils/StorageSlot.sol";
-import {DECIMALS, UNIT, HIGH_PRECISION_UNIT} from "../libraries/DataTypes.sol";
-import {PERCENTAGE_FACTOR, PercentageMath} from "../libraries/math/PercentageMath.sol";
+import {GENERAL_UNIT, DECIMALS, UNIT, HIGH_PRECISION_UNIT} from "../libraries/DataTypes.sol";
 import {LPToken} from "../tokens/LPToken.sol";
 import {OptionType, OptionPosition, PositionState, IOptionToken} from "../interfaces/IOptionToken.sol";
 import {TradeParameters, IOracle} from "../interfaces/IOracle.sol";
@@ -23,7 +22,6 @@ import "hardhat/console.sol";
 
 contract Vault is IVault, Pausable, Ownable{
     using StorageSlot for bytes32;
-    using PercentageMath for uint256;
     using Math for uint256;
     using SafeERC20 for IERC20;
 
@@ -46,17 +44,17 @@ contract Vault is IVault, Pausable, Ownable{
     uint256 private _unrealizedPremium;
     int256 private _unrealizedPNL;
 
-    uint256 private constant RESERVE_RATIO = PERCENTAGE_FACTOR * 10 / 100; // 10%
-    uint256 private FEE_RATIO =  PERCENTAGE_FACTOR * 5 / 1000; // 0.5%
-    uint256 private MAXIMUM_FEE_RATIO = PERCENTAGE_FACTOR * 125 / 1000; // 12.5%
+    uint256 private constant RESERVE_RATIO = GENERAL_UNIT * 10 / 100; // 10%
+    uint256 private FEE_RATIO =  GENERAL_UNIT * 5 / 1000; // 0.5%
+    uint256 private MAXIMUM_FEE_RATIO = GENERAL_UNIT * 125 / 1000; // 12.5%
         
-    uint256 public constant MAXIMUM_LOCK_RATIO = PERCENTAGE_FACTOR * 95 / 100; // 95%
+    uint256 public constant MAXIMUM_LOCK_RATIO = GENERAL_UNIT * 95 / 100; // 95%
     uint256 private constant _decimals = DECIMALS;
 
-    uint256 public constant MAXIMUM_CALL_STRIKE_PRICE_RATIO = PERCENTAGE_FACTOR * 200 / 100; // 200%
-    uint256 public constant MINIMUM_CALL_STRIKE_PRICE_RATIO = PERCENTAGE_FACTOR * 110 / 100; // 110%
-    uint256 public constant MAXIMUM_PUT_STRIKE_PRICE_RATIO = PERCENTAGE_FACTOR * 90 / 100; // 90%
-    uint256 public constant MINIMUM_PUT_STRIKE_PRICE_RATIO = PERCENTAGE_FACTOR * 50 / 100; // 50%
+    uint256 public constant MAXIMUM_CALL_STRIKE_PRICE_RATIO = GENERAL_UNIT * 200 / 100; // 200%
+    uint256 public constant MINIMUM_CALL_STRIKE_PRICE_RATIO = GENERAL_UNIT * 110 / 100; // 110%
+    uint256 public constant MAXIMUM_PUT_STRIKE_PRICE_RATIO = GENERAL_UNIT * 90 / 100; // 90%
+    uint256 public constant MINIMUM_PUT_STRIKE_PRICE_RATIO = GENERAL_UNIT * 50 / 100; // 50%
     uint256 public constant KEEPER_FEE = 5 * 10**13; // 0.00005 ETH
 
     uint256 public constant MINIMUM_DURATION = 3 days;
@@ -194,13 +192,13 @@ contract Vault is IVault, Pausable, Ownable{
             revert ZeroAmount(address(this));
         }
         if(optionType == OptionType.LONG_CALL){
-            if(strike_.strikePrice > strike_.spotPrice.percentMul(MAXIMUM_CALL_STRIKE_PRICE_RATIO) 
-               || strike_.strikePrice < strike_.spotPrice.percentMul(MINIMUM_CALL_STRIKE_PRICE_RATIO)){
+            if(strike_.strikePrice > strike_.spotPrice.mulDiv(MAXIMUM_CALL_STRIKE_PRICE_RATIO, GENERAL_UNIT, Math.Rounding.Down) 
+               || strike_.strikePrice < strike_.spotPrice.mulDiv(MINIMUM_CALL_STRIKE_PRICE_RATIO, GENERAL_UNIT, Math.Rounding.Up)){
                 revert InvalidStrikePrice(address(this), strike_.strikePrice, strike_.spotPrice);
             }
         } else {
-            if(strike_.strikePrice > strike_.spotPrice.percentMul(MAXIMUM_PUT_STRIKE_PRICE_RATIO) 
-               || strike_.strikePrice < strike_.spotPrice.percentMul(MINIMUM_PUT_STRIKE_PRICE_RATIO)){
+            if(strike_.strikePrice > strike_.spotPrice.mulDiv(MAXIMUM_PUT_STRIKE_PRICE_RATIO, GENERAL_UNIT, Math.Rounding.Down) 
+               || strike_.strikePrice < strike_.spotPrice.mulDiv(MINIMUM_PUT_STRIKE_PRICE_RATIO, GENERAL_UNIT, Math.Rounding.Up)){
                 revert InvalidStrikePrice(address(this), strike_.strikePrice, strike_.spotPrice);
             }
         }
@@ -210,11 +208,11 @@ contract Vault is IVault, Pausable, Ownable{
     }
 
     function _maximumLockedValueOfCollection(CollectionConfiguration memory collection, uint256 liquidity) internal pure returns (uint256){
-        return liquidity.percentMul(collection.weight);
+        return liquidity.mulDiv(collection.weight, GENERAL_UNIT, Math.Rounding.Down);
     }
 
     function _maximumLockedValue(uint256 liquidity) internal pure returns (uint256) {
-        return liquidity.percentMul(MAXIMUM_LOCK_RATIO);
+        return liquidity.mulDiv(MAXIMUM_LOCK_RATIO, GENERAL_UNIT, Math.Rounding.Down);
     }
 
     function _validateOpenOption2(CollectionConfiguration memory collection, uint256 valueToBeLocked, uint256 premium) internal view
@@ -333,7 +331,7 @@ contract Vault is IVault, Pausable, Ownable{
         _unrealizedPremium += premium;
         optionToken.activePosition(positionId, premium);
         //transfer premium from the caller to the vault
-        uint256 amountToReserve = premium.percentMul(RESERVE_RATIO);
+        uint256 amountToReserve = premium.mulDiv(RESERVE_RATIO, GENERAL_UNIT, Math.Rounding.Up);
         _strikes[position.strikeId] = strike_;
         address payer = position.payer;
         emit ReceivePremium(payer, amountToReserve, premium - amountToReserve);
@@ -424,9 +422,10 @@ contract Vault is IVault, Pausable, Ownable{
             }
             profit = (strikePrice - currentPrice).mulDiv(amount, UNIT, Math.Rounding.Down);
         }
-        uint256 fee = currentPrice.mulDiv(amount, UNIT, Math.Rounding.Down).percentMul(FEE_RATIO);
-        uint256 maximumFee = profit.percentMul(MAXIMUM_FEE_RATIO);
-        return (profit - Math.min(fee, maximumFee), maximumFee);
+        uint256 fee = currentPrice.mulDiv(amount, UNIT, Math.Rounding.Down).mulDiv(FEE_RATIO, GENERAL_UNIT, Math.Rounding.Up);
+        uint256 maximumFee = profit.mulDiv(MAXIMUM_FEE_RATIO, GENERAL_UNIT, Math.Rounding.Up);
+        fee = Math.min(fee, maximumFee);
+        return (profit - fee, fee);
     }
 
     function addMarket(address collection, uint32 weight, address optionToken) public onlyOwner override returns(uint32){
