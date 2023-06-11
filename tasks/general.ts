@@ -5,7 +5,7 @@ import {
     deployPricer,
     deployRiskCache,
     deployReserve,
-    deployBackStopPool,
+    deployBackstopPool,
     deployKeeperHelper,
     initializeLPToken,
     getAddress,
@@ -62,11 +62,11 @@ task('reserve:deploy', 'Deploy Reserve')
         const reserve = await deployReserve(verify);
     });
 
-task('backStopPool:deploy', 'Deploy BackStop Pool')
+task('backstopPool:deploy', 'Deploy Backstop Pool')
     .addFlag('verify', 'Verify contract at Etherscan')
     .setAction(async ({ verify }, hre) => {
         await hre.run('set-DRE');
-        const backStopPool = await deployBackStopPool(verify);
+        const backstopPool = await deployBackstopPool(verify);
     });
 
 task('lpToken:init', 'Initialize LP Token')

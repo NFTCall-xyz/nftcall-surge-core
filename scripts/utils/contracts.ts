@@ -10,7 +10,7 @@ import {
     NFTCallOracle,
     AssetRiskCache,
     Reserve,
-    BackStopPool,
+    BackstopPool,
     MintableERC20,
     MintableERC721,
     BlackScholes,
@@ -147,10 +147,10 @@ export const deployVault = async (
     pricer: string, 
     riskCache: string, 
     reserve: string,
-    backStopPool: string,
+    backstopPool: string,
     verify: boolean = false
     ) => {
-    const vault = await deployContract<Vault>('Vault', [asset, lpToken, oracle, pricer, riskCache, reserve, backStopPool], undefined, undefined, undefined, verify);
+    const vault = await deployContract<Vault>('Vault', [asset, lpToken, oracle, pricer, riskCache, reserve, backstopPool], undefined, undefined, undefined, verify);
     return vault;
 }
 
@@ -159,9 +159,9 @@ export const deployReserve = async (verify: boolean = false) => {
     return reserve;
 }
 
-export const deployBackStopPool = async (verify: boolean = false) => {
-    const backStopPool = await deployContract<BackStopPool>('BackStopPool', [], undefined, undefined, undefined, verify);
-    return backStopPool;
+export const deployBackstopPool = async (verify: boolean = false) => {
+    const backstopPool = await deployContract<BackstopPool>('BackstopPool', [], undefined, undefined, undefined, verify);
+    return backstopPool;
 }
 
 export const deployMintableERC20 = async (name: string, symbol: string, verify: boolean = false) => {
@@ -212,8 +212,8 @@ export const getReserve = async() => {
     return await getContract<Reserve>('Reserve');
 }
 
-export const getBackStopPool = async() => {
-    return await getContract<BackStopPool>('BackStopPool');
+export const getBackstopPool = async() => {
+    return await getContract<BackstopPool>('BackstopPool');
 }
 
 export const getMintableERC20 = async (symbol: string) => {

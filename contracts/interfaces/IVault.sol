@@ -42,7 +42,7 @@ interface IVault {
     function keeper() external view returns(address);
     function setKeeper(address keeperAddress) external;
     function reserve() external view returns(address);
-    function backStopPool() external view returns(address);
+    function backstopPool() external view returns(address);
     function unrealizedPNL() external view returns(int256);
     function updateUnrealizedPNL() external returns(int256);
     function unrealizedPremium() external view returns(uint256);
@@ -69,6 +69,8 @@ interface IVault {
     function activateMarket(address collection) external;
     function deactivateMarket(address collection) external;
     function isActiveMarket(address collection) external view returns(bool);
+    function feeRatio() external view returns(uint256);
+    function profitFeeRatio() external view returns(uint256);
 
     error ZeroAmount(address thrower);
     error InvalidStrikePrice(address thrower, uint strikePrice, uint spotPrice);

@@ -32,7 +32,7 @@ contract Vault is IVault, Pausable, Ownable{
     address private _riskCache;
     address private _pricer;
     address private _reserve;
-    address private _backStopPool;
+    address private _backstopPool;
     address private _keeper;
     uint256 private _nextId = 1;    mapping(address => CollectionConfiguration) private _collections;
     mapping(uint256 => address) private _collectionsList;
@@ -44,9 +44,9 @@ contract Vault is IVault, Pausable, Ownable{
     uint256 private _unrealizedPremium;
     int256 private _unrealizedPNL;
 
-    uint256 private constant RESERVE_RATIO = GENERAL_UNIT * 10 / 100; // 10%
+    uint256 public constant RESERVE_RATIO = GENERAL_UNIT * 10 / 100; // 10%
     uint256 private FEE_RATIO =  GENERAL_UNIT * 5 / 1000; // 0.5%
-    uint256 private MAXIMUM_FEE_RATIO = GENERAL_UNIT * 125 / 1000; // 12.5%
+    uint256 private PROFIT_FEE_RATIO = GENERAL_UNIT * 125 / 1000; // 12.5%
         
     uint256 public constant MAXIMUM_LOCK_RATIO = GENERAL_UNIT * 95 / 100; // 95%
     uint256 private constant _decimals = DECIMALS;
@@ -60,7 +60,7 @@ contract Vault is IVault, Pausable, Ownable{
     uint256 public constant MINIMUM_DURATION = 3 days;
     uint256 public constant MAXIMUM_DURATION = 30 days;
 
-    constructor (address asset, address lpToken, address oracle, address pricer, address riskCache, address reserve_, address backStopPool_)
+    constructor (address asset, address lpToken, address oracle, address pricer, address riskCache, address reserve_, address backstopPool_)
         Ownable()
     {
         _asset = asset;
@@ -69,7 +69,7 @@ contract Vault is IVault, Pausable, Ownable{
         _pricer = pricer;
         _riskCache = riskCache;
         _reserve = reserve_;
-        _backStopPool = backStopPool_;
+        _backstopPool = backstopPool_;
         _keeper = owner();
     }
 
@@ -99,8 +99,8 @@ contract Vault is IVault, Pausable, Ownable{
         return _reserve;
     }
 
-    function backStopPool() public override view returns(address) {
-        return _backStopPool;
+    function backstopPool() public override view returns(address) {
+        return _backstopPool;
     }
 
     function pause() public override onlyOwner {
@@ -169,6 +169,14 @@ contract Vault is IVault, Pausable, Ownable{
 
     function unrealizedPremium() public override view returns(uint256) {
         return _unrealizedPremium;
+    }
+
+    function feeRatio() public override view returns(uint256) {
+        return FEE_RATIO;
+    }
+
+    function profitFeeRatio() public override view returns(uint256) {
+        return PROFIT_FEE_RATIO;
     }
 
     function deposit(uint256 amount, address onBehalfOf) public override onlyUnpaused{
@@ -383,7 +391,7 @@ contract Vault is IVault, Pausable, Ownable{
         if(profit != 0){
             address to = optionToken.ownerOf(positionId);
             _realizedPNL -= int256(profit + fee);
-            IERC20(_asset).safeTransferFrom(_lpToken, _backStopPool, fee);
+            IERC20(_asset).safeTransferFrom(_lpToken, _backstopPool, fee);
             IERC20(_asset).safeTransferFrom(_lpToken, to, profit);
             emit SendRevenue(to, profit, fee);
         }
@@ -423,7 +431,7 @@ contract Vault is IVault, Pausable, Ownable{
             profit = (strikePrice - currentPrice).mulDiv(amount, UNIT, Math.Rounding.Down);
         }
         uint256 fee = currentPrice.mulDiv(amount, UNIT, Math.Rounding.Down).mulDiv(FEE_RATIO, GENERAL_UNIT, Math.Rounding.Up);
-        uint256 maximumFee = profit.mulDiv(MAXIMUM_FEE_RATIO, GENERAL_UNIT, Math.Rounding.Up);
+        uint256 maximumFee = profit.mulDiv(PROFIT_FEE_RATIO, GENERAL_UNIT, Math.Rounding.Up);
         fee = Math.min(fee, maximumFee);
         return (profit - fee, fee);
     }

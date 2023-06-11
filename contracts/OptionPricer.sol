@@ -22,7 +22,6 @@ import {AssetRiskCache} from "./AssetRiskCache.sol";
 import {NFTCallOracle} from "./NFTCallOracle.sol";
 import {OptionType} from "./interfaces/IOptionToken.sol";
 import {GENERAL_DECIMALS, GENERAL_UNIT, UNIT } from "./libraries/DataTypes.sol";
-import {PERCENTAGE_FACTOR, HALF_PERCENT, PercentageMath} from "./libraries/math/PercentageMath.sol";
 
 import "hardhat/console.sol";
 
@@ -37,6 +36,8 @@ contract OptionPricer is IPricer, Ownable, SimpleInitializable {
   using DecimalMath for uint;
   using SignedDecimalMath for int;
   using BlackScholes for BlackScholes.BlackScholesInputs;
+
+  uint256 private constant HALF_PERCENT = GENERAL_UNIT / 2;
 
   /**
    * skewP1 & skewP2 are used for skew adjustment. i.e., skewP1 = 1000, which is 0.1; skewP2 = 2000, which is actually 0.2
@@ -54,7 +55,7 @@ contract OptionPricer is IPricer, Ownable, SimpleInitializable {
   NFTCallOracle internal oracle;
   PricerParams private pricerParams;
   // riskFreeRate is ETH POS interest rate, now annually 4.8%.
-  int private riskFreeRate = int(PERCENTAGE_FACTOR * 48 / 1000);
+  int private riskFreeRate = int(GENERAL_UNIT * 48 / 1000);
 
   function initialize(address vault_, address riskCache_, address oracle_) public onlyOwner initializer {
     vault = Vault(vault_);
@@ -90,9 +91,9 @@ contract OptionPricer is IPricer, Ownable, SimpleInitializable {
       adjustedVol += adjustedVol * delta * int(delta >= 0 ? pricerParams.deltaP1 : pricerParams.deltaP2) / int(GENERAL_UNIT) / int(UNIT);
     }
     // Impact of collateralization ratio
-    uint cr = IVault(vault).totalLockedAssets() * PERCENTAGE_FACTOR / IVault(vault).totalAssets();
+    uint cr = IVault(vault).totalLockedAssets() * GENERAL_UNIT / IVault(vault).totalAssets();
     if (cr > HALF_PERCENT) {
-      adjustedVol += adjustedVol * int(cr - HALF_PERCENT) / int(PERCENTAGE_FACTOR);
+      adjustedVol += adjustedVol * int(cr - HALF_PERCENT) / int(GENERAL_UNIT);
     }
     return uint(adjustedVol);
   }
