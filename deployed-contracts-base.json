@@ -34,7 +34,7 @@
       "address": "0x39aB4Aabd99062FF3dE3487E0E9925cD294f4651"
     },
     "arbitrumGoerli": {
-      "address": "0x7908F9bc1E9bdCD28f35a42f08Ba2D0925879477"
+      "address": "0x264ef0e2eC240d424212BDf3152b288dd2FA7141"
     }
   },
   "BlackScholes": {
@@ -45,7 +45,7 @@
       "address": "0x654113e5f95ebB9D1698E9C22e9665B2722Eaa44"
     },
     "arbitrumGoerli": {
-      "address": "0x7f13b2829a9Bb8c7742FF2b2bC5b6F8EB7369c7c"
+      "address": "0x60C7A736A9b2BD96BaF80a5FC984B7eeee2B6cbE"
     }
   },
   "OptionPricer": {
@@ -56,7 +56,7 @@
       "address": "0x571320756A0f2DBffE7747eB1e71A70322172331"
     },
     "arbitrumGoerli": {
-      "address": "0x5d2e9A780f63471dF081D7712B19CeDe0Af79837"
+      "address": "0x5e177FC8fEC0E98319048CfaA2F104817B319683"
     }
   },
   "AssetRiskCache": {
@@ -67,7 +67,7 @@
       "address": "0xb33C4d99394641B5A6f08018298fEc88c87a6BA0"
     },
     "arbitrumGoerli": {
-      "address": "0x483Bc8ce8c1569814a94530F31B98D7e3314c636"
+      "address": "0x3c7F93E8A8ecC6acFDD13b047C1e72D7eD384FBB"
     }
   },
   "Reserve": {
@@ -78,18 +78,18 @@
       "address": "0x4a0C96b637adddBb5CCF2C0280A14429467ED215"
     },
     "arbitrumGoerli": {
-      "address": "0x048A4995263Cf06DDBafCbCf9c3De3462F1701b4"
+      "address": "0x6dc3b05e5dC615AB5c163B57851dFfF5880032c4"
     }
   },
   "Vault": {
     "hardhat": {
-      "address": "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6"
+      "address": "0x8A791620dd6260079BF849Dc5567aDC3F2FdC318"
     },
     "localhost": {
       "address": "0xfBAdd629393258F2410242CA815E52280A9cf3e1"
     },
     "arbitrumGoerli": {
-      "address": "0x2A53adF8230591c883Fa468116a83926F3356cdC"
+      "address": "0x5FcB6272f341Bd5101E96491767A90efB02b0D68"
     }
   },
   "operator": {
@@ -121,10 +121,18 @@
   },
   "KeeperHelper": {
     "hardhat": {
-      "address": "0x959922bE3CAee4b8Cd9a407cc3ac1C251C2007B1"
+      "address": "0x9A9f2CCfdE556A7E9Ff0848998Aa4a0CFD8863AE"
     },
     "arbitrumGoerli": {
-      "address": "0xf2b755e64F40cc897E6Ec61017b0779801848edb"
+      "address": "0xBf7b9d0cD060C16BbffCD5EbdCa1074a58b67429"
+    }
+  },
+  "BackstopPool": {
+    "hardhat": {
+      "address": "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6"
+    },
+    "arbitrumGoerli": {
+      "address": "0x590353f5E01Cbb23bF27a5a6381bD4cd599D23d9"
     }
   }
 }
