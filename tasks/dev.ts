@@ -103,6 +103,7 @@ task('dev:update', 'Deploy updated contracts')
         await hre.run('pricer:deploy', { verify });
         await hre.run('riskCache:deploy', { verify });
         await hre.run('reserve:deploy', { verify });
+        await hre.run('backstopPool:deploy', { verify });
         await hre.run('vault:deploy', { verify, asset: lpAsset });
         await hre.run('lpToken:init', { maximumSupply: '10000000' });
         await hre.run('pricer:init');
