@@ -383,13 +383,13 @@ contract Vault is IVault, Pausable, Ownable{
         tradeParameters.expiry = strike_.expiry;
         tradeParameters.amount = position.amount;
         // IOracle(_oracle).update(address(this), collection, tradeParameters);
+        address to = optionToken.ownerOf(positionId);
         optionToken.closePosition(positionId);
         delete _strikes[position.strikeId];
         emit DestoryStrike(position.strikeId);
         uint256 fee;
         (profit, fee) = _calculateExerciseProfit(position.optionType, currentPrice, strike_.strikePrice, position.amount);
         if(profit != 0){
-            address to = optionToken.ownerOf(positionId);
             _realizedPNL -= int256(profit + fee);
             IERC20(_asset).safeTransferFrom(_lpToken, _backstopPool, fee);
             IERC20(_asset).safeTransferFrom(_lpToken, to, profit);
