@@ -279,7 +279,7 @@ contract Vault is IVault, Pausable, Ownable{
         strike_.expiry = expiry;
         strike_.duration = expiry - block.timestamp;
         _validateOpenOption1(amount, optionType, strike_);
-        uint256 premium = _calculateStrikeAndPremium(collection, optionType, strike_).mulDiv(amount, UNIT, Math.Rounding.Up);
+        premium = _calculateStrikeAndPremium(collection, optionType, strike_).mulDiv(amount, UNIT, Math.Rounding.Up);
         _validateOpenOption2(config, strike_.spotPrice.mulDiv(amount, UNIT, Math.Rounding.Up), premium);
         return (premium, strike_);
     }
@@ -338,20 +338,22 @@ contract Vault is IVault, Pausable, Ownable{
         strike_.spotPrice = IOracle(_oracle).getAssetPrice(collection);
         premium = _calculateStrikeAndPremium(collection, position.optionType, strike_).mulDiv(position.amount, UNIT, Math.Rounding.Up);
         if(premium > position.maximumPremium){
-            revert PremiumTooHigh(address(this), positionId, premium, position.maximumPremium);
+            _closePendingPosition(collection, positionId);
         }
-        _unrealizedPremium += premium;
-        optionToken.activePosition(positionId, premium);
-        //transfer premium from the caller to the vault
-        uint256 amountToReserve = premium.mulDiv(RESERVE_RATIO, GENERAL_UNIT, Math.Rounding.Up);
-        _strikes[position.strikeId] = strike_;
-        address payer = position.payer;
-        emit ReceivePremium(payer, amountToReserve, premium - amountToReserve);
-        emit ReceiveKeeperFee(payer, KEEPER_FEE);
-        emit ReturnExcessPremium(payer, position.maximumPremium - premium);
-        IERC20(_asset).safeTransfer(_reserve, amountToReserve + KEEPER_FEE);
-        IERC20(_asset).safeTransfer(_lpToken, premium - amountToReserve);
-        IERC20(_asset).safeTransfer(payer, position.maximumPremium - premium);
+        else{
+            _unrealizedPremium += premium;
+            optionToken.activePosition(positionId, premium);
+            //transfer premium from the caller to the vault
+            uint256 amountToReserve = premium.mulDiv(RESERVE_RATIO, GENERAL_UNIT, Math.Rounding.Up);
+            _strikes[position.strikeId] = strike_;
+            address payer = position.payer;
+            emit ReceivePremium(payer, amountToReserve, premium - amountToReserve);
+            emit ReceiveKeeperFee(payer, KEEPER_FEE);
+            emit ReturnExcessPremium(payer, position.maximumPremium - premium);
+            IERC20(_asset).safeTransfer(_reserve, amountToReserve + KEEPER_FEE);
+            IERC20(_asset).safeTransfer(_lpToken, premium - amountToReserve);
+            IERC20(_asset).safeTransfer(payer, position.maximumPremium - premium);
+        }
     }
 
     function closePosition(address collection, uint256 positionId) public override onlyKeeper onlyUnpaused returns(uint256 profit){
@@ -406,10 +408,7 @@ contract Vault is IVault, Pausable, Ownable{
         return profit;
     }
 
-    function forceClosePendingPosition(address collection, uint256 positionId) public override onlyUnpaused onlyKeeper {
-        if(_collections[collection].frozen){
-            revert FrozenMarket(address(this), collection);
-        }
+    function _closePendingPosition(address collection, uint256 positionId) internal {
         OptionToken optionToken = OptionToken(_collections[collection].optionToken);
         _totalLockedAssets -= optionToken.lockedValue(positionId);
         OptionPosition memory position = optionToken.optionPosition(positionId);
@@ -418,9 +417,16 @@ contract Vault is IVault, Pausable, Ownable{
         emit DestoryStrike(strikeId);
         address payer = position.payer;
         uint256 premium = position.maximumPremium;
-        emit ReturnExcessPremium(payer, premium);
         optionToken.forceClosePendingPosition(positionId);
+        emit ReturnExcessPremium(payer, premium);
         IERC20(_asset).safeTransferFrom(address(this), payer, premium);
+    }
+
+    function forceClosePendingPosition(address collection, uint256 positionId) public override onlyUnpaused {
+        if(_collections[collection].frozen){
+            revert FrozenMarket(address(this), collection);
+        }
+        _closePendingPosition(collection, positionId);
     }
 
     function _calculateExerciseProfit(OptionType optionType, uint256 currentPrice, uint256 strikePrice, uint256 amount) internal view returns(uint256, uint256){
