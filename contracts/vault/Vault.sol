@@ -419,12 +419,19 @@ contract Vault is IVault, Pausable, Ownable{
         uint256 premium = position.maximumPremium;
         optionToken.forceClosePendingPosition(positionId);
         emit ReturnExcessPremium(payer, premium);
-        IERC20(_asset).safeTransferFrom(address(this), payer, premium);
+        IERC20(_asset).safeTransfer(payer, premium);
     }
 
     function forceClosePendingPosition(address collection, uint256 positionId) public override onlyUnpaused {
         if(_collections[collection].frozen){
             revert FrozenMarket(address(this), collection);
+        }
+        address caller = _msgSender();
+        OptionToken optionToken = OptionToken(_collections[collection].optionToken);
+        address owner =  optionToken.ownerOf(positionId);
+        address payer = optionToken.optionPosition(positionId).payer;
+        if(caller != _keeper || caller != owner|| caller != payer){
+            revert OnlyKeeperOrOwnerOrPayer(address(this), caller, _keeper, owner, payer);
         }
         _closePendingPosition(collection, positionId);
     }
