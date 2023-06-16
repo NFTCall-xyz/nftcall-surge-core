@@ -5,10 +5,12 @@ struct NFTCollection {
     uint256 price;
     uint256 vol;
     uint256 maximumOptionAmount;
+    uint256 openInterest;
 }
 
 struct VaultLPToken {
     uint256 wETHBalance;
+    uint256 wETHAllowance;
     uint256 balance;
     uint256 lockedBalance;
     uint256 maxWithdraw;
@@ -17,8 +19,10 @@ struct VaultLPToken {
 
 struct Vault {
     VaultLPToken lpToken;
+    uint256 wETHAllowance;
     uint256 totalSupply;
     uint256 totalAssets;
+    uint256 executionFee;
     uint256 totalLockedAssets;
     int256 unrealizedPNL;
     uint256 unrealizedPremium;

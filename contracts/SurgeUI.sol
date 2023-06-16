@@ -1,25 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.17;
 
-import {PERCENTAGE_FACTOR, PercentageMath} from "./libraries/math/PercentageMath.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "./interfaces/IOracle.sol";
 import "./interfaces/IVault.sol";
-import "./interfaces/IOptionToken.sol";
 import {IPricer} from "./interfaces/IPricer.sol";
 
 import "./tokens/LPToken.sol";
+import "./tokens/OptionToken.sol";
 
 import "./interfaces/ISurgeUI.sol";
 
 contract SurgeUI {
-    using Math for uint256;
-    using PercentageMath for uint256;
-
-    uint256 private constant PREMIUM_UPSCALE_RATIO =
-        (PERCENTAGE_FACTOR * 150) / 100; // 150%
-
     function _getNFTCollection(
         address collectionAddress,
         address oracleAddress,
@@ -36,9 +29,38 @@ contract SurgeUI {
             collectionAddress,
             OptionType.LONG_CALL
         );
-        // collection_.maximumOptionAmount = 0;
+
+        collection_.openInterest = _getOpenInterest(
+            vaultAddress,
+            vaultInstance.marketConfiguration(collectionAddress).optionToken
+        );
 
         return collection_;
+    }
+
+    function _getOpenInterest(
+        address vaultAddress,
+        address optionTokenAddress
+    ) internal view returns (uint256 totalActiveAmount) {
+        totalActiveAmount = 0;
+
+        IVault vaultInstance = IVault(vaultAddress);
+        OptionToken optionTokenInstance = OptionToken(optionTokenAddress);
+        uint256 currentTime = block.timestamp;
+
+        for (uint256 i = 0; i < optionTokenInstance.totalSupply(); ++i) {
+            uint256 tokenId = optionTokenInstance.tokenByIndex(i);
+            OptionPosition memory position = optionTokenInstance.optionPosition(
+                tokenId
+            );
+            if (
+                position.state == PositionState.ACTIVE &&
+                vaultInstance.strike(position.strikeId).expiry > currentTime
+            ) {
+                totalActiveAmount += position.amount;
+            }
+        }
+        return totalActiveAmount;
     }
 
     function getNFTCollections(
@@ -85,6 +107,14 @@ contract SurgeUI {
 
             vault_.lpToken.balance = lpTokenInstance.balanceOf(userAddress);
             vault_.lpToken.wETHBalance = wETHInstance.balanceOf(userAddress);
+            vault_.lpToken.wETHAllowance = wETHInstance.allowance(
+                userAddress,
+                lpTokenAddress
+            );
+            vault_.wETHAllowance = wETHInstance.allowance(
+                userAddress,
+                vaultAddress
+            );
             vault_.lpToken.lockedBalance = lpTokenInstance.lockedBalanceOf(
                 userAddress
             );
@@ -97,6 +127,7 @@ contract SurgeUI {
         }
 
         vault_.totalAssets = vaultInstance.totalAssets();
+        vault_.executionFee = vaultInstance.KEEPER_FEE();
         vault_.totalLockedAssets = vaultInstance.totalLockedAssets();
         vault_.unrealizedPNL = vaultInstance.unrealizedPNL();
         vault_.unrealizedPremium = vaultInstance.unrealizedPremium();
@@ -128,32 +159,7 @@ contract SurgeUI {
         address optionTokenAddress,
         uint256 positionId
     ) external view returns (OptionPosition memory) {
-        IOptionToken optionTokenInstance = IOptionToken(optionTokenAddress);
+        OptionToken optionTokenInstance = OptionToken(optionTokenAddress);
         return optionTokenInstance.optionPosition(positionId);
-    }
-
-    function getPremium(
-        address pricerAddress,
-        address collection,
-        OptionType optionType,
-        Strike memory strike_
-    ) external view returns (uint256) {
-        IPricer pricer = IPricer(pricerAddress);
-        uint256 adjustedVol = pricer.getAdjustedVol(
-            collection,
-            optionType,
-            strike_.strikePrice
-        );
-        uint256 premium = pricer
-            .getPremium(
-                optionType,
-                strike_.spotPrice,
-                strike_.strikePrice,
-                adjustedVol,
-                strike_.duration
-            )
-            .percentMul(PREMIUM_UPSCALE_RATIO);
-
-        return premium;
     }
 }
