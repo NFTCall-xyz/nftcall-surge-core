@@ -313,4 +313,44 @@ makeSuite('Vault', (testEnv) => {
     const balanceAfter = await eth.balanceOf(owner.address);
     expect(balanceAfter.sub(balanceBefore)).to.be.equal(profit);
   });
+
+  it("Should be able to cancel a pending position", async() => {
+    const {vault, keeperHelper, eth, deployer, markets, users, oracle} = testEnv;
+    if(vault === undefined || keeperHelper === undefined || deployer === undefined 
+      || oracle == undefined || eth == undefined
+      || Object.keys(markets).length == 0 || Object.keys(users).length == 0) {
+      throw new Error('testEnv not initialized');
+    }
+    const market = markets['BAYC'];
+    const nft = market.nft;
+    const optionToken = market.optionToken;
+    const expiry = await time.latest() + 28 * 3600 * 24;
+    const strikePrice = bigNumber(15, 19);
+    const amount = bigNumber(5, 17);
+    const premium = (await vault.estimatePremium(nft, 0, strikePrice, expiry, amount)).mul(105).div(100);
+    const receiver = users[0];
+    const keeperFee = await vault.KEEPER_FEE();
+    await eth.approve(vault.address, premium.add(keeperFee));
+    const openTxRec = await waitTx(
+      await vault.openPosition(
+        nft,
+        receiver.address,
+        0,
+        strikePrice,
+        expiry,
+        amount, premium));
+    const events = openTxRec.events;
+    expect(events).is.not.undefined;
+    const positionIds = await keeperHelper.getPendingOptions(nft);
+    let state = await optionToken.optionPositionState(positionIds[0]);
+    expect(state).to.be.equal(1); // PENDING
+    const balanceBefore = await eth.balanceOf(await vault.reserve());
+    const userBalanceBefore = await eth.balanceOf(deployer.address);
+    await vault.forceClosePendingPosition(nft, positionIds[0]);
+    const balanceAfter = await eth.balanceOf(await vault.reserve());
+    const userBalanceAfter = await eth.balanceOf(deployer.address);
+    expect(balanceAfter.sub(balanceBefore)).to.be.equal(keeperFee);
+    expect(userBalanceAfter.sub(userBalanceBefore)).to.be.equal(premium);
+
+  });
 });

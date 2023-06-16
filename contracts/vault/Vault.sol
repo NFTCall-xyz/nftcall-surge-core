@@ -413,13 +413,14 @@ contract Vault is IVault, Pausable, Ownable{
         _totalLockedAssets -= optionToken.lockedValue(positionId);
         OptionPosition memory position = optionToken.optionPosition(positionId);
         uint256 strikeId = position.strikeId;
-        delete _strikes[strikeId];
-        emit DestoryStrike(strikeId);
         address payer = position.payer;
         uint256 premium = position.maximumPremium;
         optionToken.forceClosePendingPosition(positionId);
+        delete _strikes[strikeId];
+        emit DestoryStrike(strikeId);
         emit ReturnExcessPremium(payer, premium);
         IERC20(_asset).safeTransfer(payer, premium);
+        IERC20(_asset).safeTransfer(_reserve, KEEPER_FEE);
     }
 
     function forceClosePendingPosition(address collection, uint256 positionId) public override onlyUnpaused {
@@ -430,7 +431,7 @@ contract Vault is IVault, Pausable, Ownable{
         OptionToken optionToken = OptionToken(_collections[collection].optionToken);
         address owner =  optionToken.ownerOf(positionId);
         address payer = optionToken.optionPosition(positionId).payer;
-        if(caller != _keeper || caller != owner|| caller != payer){
+        if(caller != _keeper && caller != owner && caller != payer){
             revert OnlyKeeperOrOwnerOrPayer(address(this), caller, _keeper, owner, payer);
         }
         _closePendingPosition(collection, positionId);
