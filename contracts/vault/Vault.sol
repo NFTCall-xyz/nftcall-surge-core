@@ -434,6 +434,9 @@ contract Vault is IVault, Pausable, Ownable{
         if(caller != _keeper && caller != owner && caller != payer){
             revert OnlyKeeperOrOwnerOrPayer(address(this), caller, _keeper, owner, payer);
         }
+        if(caller == owner || caller == payer){
+            emit UserCancelPosition(caller, positionId);
+        }
         _closePendingPosition(collection, positionId);
     }
 

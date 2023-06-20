@@ -40,6 +40,7 @@ interface IVault {
     event DeactivateMarket(address indexed operator, address indexed collection);
     event ReceivePremiumAndFee(address indexed user, uint256 premium, uint256 fee);
     event ReturnExcessPremium(address indexed user, uint256 returnedPremium);
+    event UserCancelPosition(address indexed user, uint256 indexed positionId);
 
     function KEEPER_FEE() external view returns(uint256);
     function RESERVE_RATIO() external view returns(uint256);
