@@ -25,10 +25,6 @@ interface IVault {
 
     event CreateStrike(uint256 indexed strikeId, uint256 duration, uint256 expiration, uint256 spotPrice, uint256 strikePrice);
     event DestoryStrike(uint256 indexed strikeId);
-    event OpenPosition(address indexed collection, uint256 indexed strikeId, uint256 indexed positionId, uint256 estimatedPremium);
-    event ReceivePremium(address indexed user, uint256 amountToReserve, uint256 amountToLiquidityPool);
-    event ReceiveKeeperFee(address indexed user, uint256 amount);
-    event SendRevenue(address indexed receiver, uint256 amount, uint256 fee);
     event CreateMarket(address indexed collection, uint32 weight, address optionToken);
     event KeeperAddressUpdated(address indexed keeperAddress);
     event UpdateLPTokenPrice(address indexed lpToken, uint256 newPrice);
@@ -38,9 +34,23 @@ interface IVault {
     event DefreezeMarket(address indexed operator, address indexed collection);
     event ActivateMarket(address indexed operator, address indexed collection);
     event DeactivateMarket(address indexed operator, address indexed collection);
-    event ReceivePremiumAndFee(address indexed user, uint256 premium, uint256 fee);
-    event ReturnExcessPremium(address indexed user, uint256 returnedPremium);
-    event UserCancelPosition(address indexed user, uint256 indexed positionId);
+
+    struct OpenPositionEventParameter {
+        OptionType optionType;
+        uint256 expiration;
+        uint256 spotPrice;
+        uint256 strikePrice;
+        uint256 amount;
+        uint256 premium;
+        uint256 keeperFee;
+    }
+
+    event OpenPosition(address caller, address indexed receiver, address indexed collection, uint256 indexed positionId, OpenPositionEventParameter parameter);
+    event ActivatePosition(address indexed owner, address indexed collection, uint256 indexed positionId, uint256 premium, uint256 excessPremium);
+    event ExercisePosition(address indexed owner, address indexed collection, uint256 indexed positionId, uint256 revenue, uint256 exerciseFee);
+    event ExpirePosition(address indexed owner, address indexed collection, uint256 indexed positionId);
+    event CancelPosition(address indexed owner, address indexed collection, uint256 indexed positionId, uint256 returnedPremium);
+    event FailPosition(address indexed owner, address indexed collection, uint256 indexed positionId, uint256 returnedPremium);
 
     function KEEPER_FEE() external view returns(uint256);
     function RESERVE_RATIO() external view returns(uint256);
