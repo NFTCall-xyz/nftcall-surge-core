@@ -35,7 +35,7 @@ interface IVault {
     event ActivateMarket(address indexed operator, address indexed collection);
     event DeactivateMarket(address indexed operator, address indexed collection);
 
-    struct OpenPositionEventParameter {
+    struct OpenPositionEventParameters {
         OptionType optionType;
         uint256 expiration;
         uint256 spotPrice;
@@ -45,7 +45,7 @@ interface IVault {
         uint256 keeperFee;
     }
 
-    event OpenPosition(address caller, address indexed receiver, address indexed collection, uint256 indexed positionId, OpenPositionEventParameter parameter);
+    event OpenPosition(address caller, address indexed receiver, address indexed collection, uint256 indexed positionId, OpenPositionEventParameters parameters);
     event ActivatePosition(address indexed owner, address indexed collection, uint256 indexed positionId, uint256 premium, uint256 excessPremium);
     event ExercisePosition(address indexed owner, address indexed collection, uint256 indexed positionId, uint256 revenue, uint256 exerciseFee);
     event ExpirePosition(address indexed owner, address indexed collection, uint256 indexed positionId);

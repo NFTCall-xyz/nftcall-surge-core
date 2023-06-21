@@ -311,15 +311,15 @@ contract Vault is IVault, Pausable, Ownable{
         OptionToken optionToken = OptionToken( _collections[collection].optionToken);
         positionId = optionToken.openPosition(_msgSender(), onBehalfOf, optionType, strikeId, amount, maximumPremium);
         _totalLockedAssets += optionToken.lockedValue(positionId);
-        OpenPositionEventParameter memory eventParameter;
-        eventParameter.expiration = strike_.expiry;
-        eventParameter.spotPrice = strike_.spotPrice;
-        eventParameter.strikePrice = strike_.strikePrice;
-        eventParameter.optionType = optionType;
-        eventParameter.amount = amount;
-        eventParameter.premium = premium;
-        eventParameter.keeperFee = KEEPER_FEE;
-        emit OpenPosition(_msgSender(), onBehalfOf, collection, positionId, eventParameter);
+        OpenPositionEventParameters memory eventParameters;
+        eventParameters.expiration = strike_.expiry;
+        eventParameters.spotPrice = strike_.spotPrice;
+        eventParameters.strikePrice = strike_.strikePrice;
+        eventParameters.optionType = optionType;
+        eventParameters.amount = amount;
+        eventParameters.premium = premium;
+        eventParameters.keeperFee = KEEPER_FEE;
+        emit OpenPosition(_msgSender(), onBehalfOf, collection, positionId, eventParameters);
         IERC20(_asset).safeTransferFrom(_msgSender(), address(this), maximumPremium + KEEPER_FEE);
         return (positionId, premium);
     }
