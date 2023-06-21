@@ -188,7 +188,7 @@ makeSuite('Vault', (testEnv) => {
     const events = openTxRec.events;
     expect(events).is.not.undefined;
     const openEvent = events?.filter(event => event.topics[0] == vault.interface.getEventTopic('OpenPosition'))[0];
-    const estimatedPremium = openEvent.args['estimatedPremium'];
+    const estimatedPremium = openEvent.args['parameters']['premium'];
     expect(estimatedPremium).to.be.equal(BigNumber.from("778208870944333238").mul(amount).add(bigNumber(1,18)).sub(1).div(bigNumber(1, 18)));
     const vaultBalance = await eth.balanceOf(vault.address);
     expect(vaultBalance).to.be.equal(premium.add(keeperFee));
@@ -239,7 +239,7 @@ makeSuite('Vault', (testEnv) => {
     const events = openTxRec.events;
     expect(events).is.not.undefined;
     const openEvent = events?.filter(event => event.topics[0] == vault.interface.getEventTopic('OpenPosition'))[0];
-    const estimatedPremium = openEvent.args['estimatedPremium'];
+    const estimatedPremium = openEvent.args['parameters']['premium'];
     expect(estimatedPremium).to.be.equal(BigNumber.from("778208870944333238").mul(amount).add(bigNumber(1,18)).sub(1).div(bigNumber(1, 18)));
     const positionIds = await keeperHelper.getPendingOptions(nft);
     let state = await optionToken.optionPositionState(positionIds[0]);
