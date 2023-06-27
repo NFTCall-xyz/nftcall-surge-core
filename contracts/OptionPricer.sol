@@ -98,14 +98,14 @@ contract OptionPricer is IPricer, Ownable, SimpleInitializable {
     return uint(adjustedVol);
   }
 
-  function getPremium(OptionType ot, uint S, uint K, uint vol, uint duration) public view override returns (uint) {
-    (uint call, uint put) = optionPrices(S, K, vol, duration);
+  function getPremiumDeltaStdVega(OptionType ot, uint S, uint K, uint vol, uint duration) public view override returns (uint, int, uint, uint) {
+    BlackScholes.PricesDeltaStdVega memory pricesDeltaStdVega = optionPricesDeltaStdVega(S, K, vol, duration);
     if (ot == OptionType.LONG_CALL)
-      return call;
+      return (pricesDeltaStdVega.callPrice, pricesDeltaStdVega.callDelta, pricesDeltaStdVega.vega, pricesDeltaStdVega.stdVega);
     else if (ot == OptionType.LONG_PUT)
-      return put;
+      return (pricesDeltaStdVega.putPrice, pricesDeltaStdVega.putDelta, pricesDeltaStdVega.vega, pricesDeltaStdVega.stdVega);
     else
-      return 0;
+      return (0, 0, 0, 0);
   }
 
   function optionPrices(uint S, uint K, uint vol, uint duration) public view override returns (uint call, uint put) {
@@ -118,6 +118,18 @@ contract OptionPricer is IPricer, Ownable, SimpleInitializable {
       riskFreeRate * int(decimalsDiff)
     );
     (call, put) = BlackScholes.optionPrices(bsInput);
+  }
+
+  function optionPricesDeltaStdVega(uint S, uint K, uint vol, uint duration) public view override returns (BlackScholes.PricesDeltaStdVega memory pricesDeltaStdVega) {
+    uint decimalsDiff = 10 ** (DecimalMath.decimals-GENERAL_DECIMALS);
+    BlackScholes.BlackScholesInputs memory bsInput = BlackScholes.BlackScholesInputs(
+      duration,
+      vol,
+      S,
+      K,
+      riskFreeRate * int(decimalsDiff)
+    );
+    pricesDeltaStdVega = BlackScholes.pricesDeltaStdVega(bsInput);
   }
 
   function delta(uint S, uint K, uint vol, uint duration) public view override returns (int callDelta, int putDelta) {

@@ -55,6 +55,16 @@ task('riskCache:deploy', 'Deploy Risk Cache')
         const riskCache = await deployRiskCache(verify);
     });
 
+task('riskCache:init', 'Initialize Risk Cache')
+    .setAction(async ({ verify }, hre) => {
+        await hre.run('set-DRE');
+        const riskCache = await getRiskCache();
+        const vault = await getVault();
+        if(!riskCache) throw new Error(`Risk Cache not found`);
+        if(!vault) throw new Error(`Vault not found`);
+        await waitTx(await riskCache.transferOwnership(vault.address));
+    });
+
 task('reserve:deploy', 'Deploy Reserve')
     .addFlag('verify', 'Verify contract at Etherscan')
     .setAction(async ({ verify }, hre) => {

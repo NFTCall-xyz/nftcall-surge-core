@@ -1,6 +1,6 @@
 //SPDX-License-Identifier: ISC
 pragma solidity ^0.8.17;
-
+import "@openzeppelin/contracts/utils/math/Math.sol" as OZMath;
 /**
  * @title Math
  * @author Lyra
@@ -26,5 +26,31 @@ library Math {
   /// @param m represents 1eX where X is the number of trailing 0's
   function ceil(uint a, uint m) internal pure returns (uint) {
     return ((a + m - 1) / m) * m;
+  }
+
+  function flag(int val) internal pure returns (int) {
+    if(val < 0) {
+      return -1;
+    } else if(val > 0) {
+      return 1;
+    } else {
+      return 0;
+    }
+  }
+
+  function flagAbs(int val) internal pure returns (int, uint) {
+    if(val < 0) {
+      return (-1, uint(-val));
+    } else if(val > 0) {
+      return (1, uint(val));
+    } else {
+      return (0, 0);
+    }
+  }
+
+  function iMulDiv(int a, int b, uint denominator, OZMath.Math.Rounding rounding) internal pure returns(int) {
+    (int flagA, uint absA) = flagAbs(a);
+    (int flagB, uint absB) = flagAbs(b);
+    return flagA * flagB * int(OZMath.Math.mulDiv(absA, absB, denominator, rounding));
   }
 }

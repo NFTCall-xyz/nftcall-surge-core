@@ -33,13 +33,21 @@ contract AssetRiskCache is IAssetRiskCache, Ownable, SimpleInitializable, Reentr
   // L1 address of asset => its AssetRisk
   mapping(address => AssetRisk) internal assetRisks;
   
-  function getAssetRisk(address asset) public view returns (int delta, int PNL) {
+  function getAssetRisk(address asset) public view override returns (int delta, int PNL) {
     return (assetRisks[asset].delta, assetRisks[asset].unrealizedPNL);
   }
 
-  function updateAssetRisk(address asset, int delta, int PNL) external onlyOwner {
+  function getAssetDelta(address asset) public view override returns (int delta) {
+    return assetRisks[asset].delta;
+  }
+
+  function updateAssetRisk(address asset, int delta, int PNL) external override onlyOwner {
     AssetRisk storage ar = assetRisks[asset];
     ar.delta = delta;
     ar.unrealizedPNL = PNL;
+  }
+
+  function updateAssetDelta(address asset, int delta) external override onlyOwner {
+    assetRisks[asset].delta = delta;
   }
 }

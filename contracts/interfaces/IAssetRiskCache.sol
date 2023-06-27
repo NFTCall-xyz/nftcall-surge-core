@@ -10,4 +10,7 @@ interface IAssetRiskCache {
     @dev
      */
   function getAssetRisk(address asset) external view returns (int delta, int PNL);
+  function getAssetDelta(address asset) external view returns (int delta);
+  function updateAssetRisk(address asset, int delta, int PNL) external;
+  function updateAssetDelta(address asset, int delta) external;
 }

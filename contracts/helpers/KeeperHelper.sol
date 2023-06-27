@@ -100,32 +100,40 @@ contract KeeperHelper is Ownable{
 
     function batchActivateOptions(address collection, uint256[] calldata positionIds) external onlyOwner{
         IVault vault_ = IVault(_vault);
-        OptionToken optionToken = OptionToken(vault_.marketConfiguration(collection).optionToken);
         for(uint256 i = 0; i < positionIds.length; ++i){
             uint256 positionId = positionIds[i];
-            OptionPosition memory position = optionToken.optionPosition(positionId);
             vault_.activePosition(collection, positionId);
         }
     }
 
     function batchCloseOptions(address collection, uint256[] calldata positionIds) external onlyOwner{
         IVault vault_ = IVault(_vault);
-        OptionToken optionToken = OptionToken(vault_.marketConfiguration(collection).optionToken);
-        uint256 currentTime = block.timestamp;
         for(uint256 i = 0; i < positionIds.length; ++i){
             uint256 positionId = positionIds[i];
-            OptionPosition memory position = optionToken.optionPosition(positionId);
             vault_.closePosition(collection, positionId);
         }
     }
 
     function batchForceClosePendingPositions(address collection, uint256[] calldata positionIds) external onlyOwner {
         IVault vault_ = IVault(_vault);
-        OptionToken optionToken = OptionToken(vault_.marketConfiguration(collection).optionToken);
         for(uint256 i = 0; i < positionIds.length; ++i){
             uint256 positionId = positionIds[i];
-            OptionPosition memory position = optionToken.optionPosition(positionId);
             vault_.forceClosePendingPosition(collection, positionId);
         }
+    }
+
+    function sumPNLWeightedDelta(address collection, uint256[] calldata positionIds) external view returns(int256 PNL, int256 weightedDelta) {
+        IVault vault_ = IVault(_vault);
+        for(uint256 i = 0; i < positionIds.length; ++i){
+            uint256 positionId = positionIds[i];
+            (int256 pPNL, int256 pDelta) = vault_.positionPNLWeightedDelta(collection, positionId);
+            PNL -= pPNL;
+            weightedDelta -= pDelta;
+        }
+    }
+
+    function updateCollectionRisk(address collection, int256 delta, int256 PNL) external onlyOwner {
+        IVault vault_ = IVault(_vault);
+        vault_.updateCollectionRisk(collection, delta, PNL);
     }
 }
