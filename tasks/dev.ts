@@ -98,7 +98,7 @@ task('dev:update', 'Deploy updated contracts')
         if(!operator) throw new Error(`Operator not found`);
         const operatorAddress = await operator.getAddress();
         saveAddress('operator', operatorAddress);
-        await hre.run('lpToken:deploy', { verify, underlying: lpAsset, underlyingName: "WETH" });
+        await hre.run('lpToken:deploy', { verify, underlying: lpAsset, underlyingName: "ETH" });
         await hre.run('blackScholes:deploy', { verify });
         await hre.run('pricer:deploy', { verify });
         await hre.run('riskCache:deploy', { verify });

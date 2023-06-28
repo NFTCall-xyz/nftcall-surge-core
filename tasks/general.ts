@@ -31,7 +31,7 @@ task('lpToken:deploy', 'Deploy LP Token')
         await hre.run('set-DRE');
         const underlyingAddress = await getAddress(underlying);
         if(!underlyingAddress) throw new Error(`Asset ${underlying} not found`);
-        const lpToken = await deployLPToken(underlyingAddress, `NFTCall ${underlyingName}`, `nc${underlyingName}`, verify);
+        const lpToken = await deployLPToken(underlyingAddress, `NFTCall ${underlyingName} LP Token`, `nc${underlyingName}`, verify);
     });
 
 task('blackScholes:deploy', 'Deploy Black Scholes')
