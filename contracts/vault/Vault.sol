@@ -55,7 +55,7 @@ contract Vault is IVault, Pausable, Ownable{
     uint256 public override constant RESERVE_RATIO = GENERAL_UNIT * 10 / 100; // 10%
     uint256 public override constant MAXIMUM_LOCK_RATIO = GENERAL_UNIT * 95 / 100; // 95%
 
-    uint256 public override constant MAXIMUM_CALL_STRIKE_PRICE_RATIO = GENERAL_UNIT * 200 / 100; // 200%
+    uint256 public override constant MAXIMUM_CALL_STRIKE_PRICE_RATIO = GENERAL_UNIT * 210 / 100; // 210%
     uint256 public override constant MINIMUM_CALL_STRIKE_PRICE_RATIO = GENERAL_UNIT * 110 / 100; // 110%
     uint256 public override constant MAXIMUM_PUT_STRIKE_PRICE_RATIO = GENERAL_UNIT * 90 / 100; // 90%
     uint256 public override constant MINIMUM_PUT_STRIKE_PRICE_RATIO = GENERAL_UNIT * 50 / 100; // 50%
@@ -375,6 +375,8 @@ contract Vault is IVault, Pausable, Ownable{
             if(excessPremium > 0){
                 IERC20(_asset).safeTransfer(payer, position.maximumPremium - premium);
             }
+            uint256 price = LPToken(_lpToken).convertToAssets(HIGH_PRECISION_UNIT);
+            emit UpdateLPTokenPrice(_lpToken, price);
         }
     }
 
