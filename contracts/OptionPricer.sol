@@ -76,7 +76,7 @@ contract OptionPricer is IPricer, Ownable, SimpleInitializable {
     (int delta_, ) = IAssetRiskCache(risk).getAssetRisk(asset);
     uint assetLockedVal = IOptionToken(asset).totalValue();
     uint vaultTotalAssets = IVault(vault).totalAssets();
-    CollectionConfiguration memory assetConfig = IVault(vault).marketConfiguration(asset);
+    IVault.CollectionConfiguration memory assetConfig = IVault(vault).marketConfiguration(asset);
     // Impact of skew, delta, and unrealized PNL
     int adjustedVol = int(vol);
     if (ot == OptionType.LONG_CALL) {
