@@ -20,7 +20,7 @@ import {IAssetRiskCache} from "./interfaces/IAssetRiskCache.sol";
 import {Vault} from "./vault/Vault.sol";
 import {AssetRiskCache} from "./AssetRiskCache.sol";
 import {NFTCallOracle} from "./NFTCallOracle.sol";
-import {OptionType} from "./interfaces/IOptionToken.sol";
+import {OptionType, IOptionToken} from "./interfaces/IOptionToken.sol";
 import {GENERAL_DECIMALS, GENERAL_UNIT, UNIT } from "./libraries/DataTypes.sol";
 
 import "hardhat/console.sol";
@@ -71,9 +71,12 @@ contract OptionPricer is IPricer, Ownable, SimpleInitializable {
    * S is the price of the underlying asset at open time
    * K is the strike price of option
    */
-  function getAdjustedVol(address asset, OptionType ot, uint K) public view override returns (uint) {
+  function getAdjustedVol(address asset, OptionType ot, uint K, uint lockValue) public view override returns (uint) {
     (uint S, uint vol) = IOracle(oracle).getAssetPriceAndVol(asset);
     (int delta_, ) = IAssetRiskCache(risk).getAssetRisk(asset);
+    uint assetLockedVal = IOptionToken(asset).totalValue();
+    uint vaultTotalAssets = IVault(vault).totalAssets();
+    CollectionConfiguration memory assetConfig = IVault(vault).marketConfiguration(asset);
     // Impact of skew, delta, and unrealized PNL
     int adjustedVol = int(vol);
     if (ot == OptionType.LONG_CALL) {
@@ -81,14 +84,14 @@ contract OptionPricer is IPricer, Ownable, SimpleInitializable {
         revert IllegalStrikePrice(msg.sender, S, K);
       }
       adjustedVol += int(vol*(K-S)*pricerParams.skewP1/S/(GENERAL_UNIT) + vol*(K-S)*(K-S)*pricerParams.skewP2/S/S/(GENERAL_UNIT));
-      adjustedVol -= adjustedVol * delta_ * int(delta_ <= 0 ? pricerParams.deltaP1 : pricerParams.deltaP2) / int(GENERAL_UNIT) / int(UNIT);
+      adjustedVol -= adjustedVol * delta_ * int(delta_ <= 0 ? pricerParams.deltaP1 : pricerParams.deltaP2) * int(assetLockedVal + lockValue) / int(UNIT) / vaultTotalAssets / int(assetConfig.weight);
     } else {
       if (K >= S) {
         revert IllegalStrikePrice(msg.sender, S, K);
       }
       uint rK = S * S / K;
       adjustedVol += int(vol*(rK-S)*pricerParams.skewP1/S/(GENERAL_UNIT) + vol*(rK-S)*(rK-S)*pricerParams.skewP2/S/S/(GENERAL_UNIT));
-      adjustedVol += adjustedVol * delta_ * int(delta_ >= 0 ? pricerParams.deltaP1 : pricerParams.deltaP2) / int(GENERAL_UNIT) / int(UNIT);
+      adjustedVol += adjustedVol * delta_ * int(delta_ >= 0 ? pricerParams.deltaP1 : pricerParams.deltaP2) * int(assetLockedVal + lockValue) / int(UNIT) / vaultTotalAssets / int(assetConfig.weight);
     }
     // Impact of collateralization ratio
     uint cr = IVault(vault).totalLockedAssets() * GENERAL_UNIT / IVault(vault).totalAssets();
