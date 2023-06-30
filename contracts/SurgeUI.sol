@@ -3,6 +3,7 @@ pragma solidity 0.8.17;
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "../contracts/libraries/DataTypes.sol";
 import "./interfaces/IOracle.sol";
 import "./interfaces/IVault.sol";
 import {IPricer} from "./interfaces/IPricer.sol";
@@ -100,10 +101,10 @@ contract SurgeUI {
         Vault memory vault_;
 
         IVault vaultInstance = IVault(vaultAddress);
+        LPToken lpTokenInstance = LPToken(lpTokenAddress);
 
         if (userAddress != address(0)) {
             ERC20 wETHInstance = ERC20(wETHAddress);
-            LPToken lpTokenInstance = LPToken(lpTokenAddress);
 
             vault_.lpToken.balance = lpTokenInstance.balanceOf(userAddress);
             vault_.lpToken.wETHBalance = wETHInstance.balanceOf(userAddress);
@@ -127,6 +128,8 @@ contract SurgeUI {
         }
 
         vault_.totalAssets = vaultInstance.totalAssets();
+        vault_.ncETHPrice = lpTokenInstance.convertToAssets(UNIT);
+        vault_.totalSupply = lpTokenInstance.totalSupply();
         vault_.executionFee = vaultInstance.KEEPER_FEE();
         vault_.totalLockedAssets = vaultInstance.totalLockedAssets();
         vault_.unrealizedPNL = vaultInstance.unrealizedPNL();
@@ -161,5 +164,20 @@ contract SurgeUI {
     ) external view returns (OptionPosition memory) {
         OptionToken optionTokenInstance = OptionToken(optionTokenAddress);
         return optionTokenInstance.optionPosition(positionId);
+    }
+
+    function getAnalytics(
+        address vaultAddress,
+        address lpTokenAddress
+    ) external view returns (Analytics memory) {
+        Analytics memory analytics_;
+
+        IVault vaultInstance = IVault(vaultAddress);
+        analytics_.TVL = vaultInstance.totalAssets();
+
+        LPToken lpTokenInstance = LPToken(lpTokenAddress);
+        analytics_.ncETHPrice = lpTokenInstance.convertToAssets(UNIT);
+
+        return analytics_;
     }
 }

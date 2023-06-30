@@ -19,6 +19,7 @@ struct VaultLPToken {
 
 struct Vault {
     VaultLPToken lpToken;
+    uint256 ncETHPrice;
     uint256 wETHAllowance;
     uint256 totalSupply;
     uint256 totalAssets;
@@ -26,4 +27,9 @@ struct Vault {
     uint256 totalLockedAssets;
     int256 unrealizedPNL;
     uint256 unrealizedPremium;
+}
+
+struct Analytics {
+    uint256 TVL;
+    uint256 ncETHPrice;
 }
