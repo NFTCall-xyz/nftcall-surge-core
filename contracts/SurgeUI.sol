@@ -31,37 +31,7 @@ contract SurgeUI {
             OptionType.LONG_CALL
         );
 
-        collection_.openInterest = _getOpenInterest(
-            vaultAddress,
-            vaultInstance.marketConfiguration(collectionAddress).optionToken
-        );
-
         return collection_;
-    }
-
-    function _getOpenInterest(
-        address vaultAddress,
-        address optionTokenAddress
-    ) internal view returns (uint256 totalActiveAmount) {
-        totalActiveAmount = 0;
-
-        IVault vaultInstance = IVault(vaultAddress);
-        OptionToken optionTokenInstance = OptionToken(optionTokenAddress);
-        uint256 currentTime = block.timestamp;
-
-        for (uint256 i = 0; i < optionTokenInstance.totalSupply(); ++i) {
-            uint256 tokenId = optionTokenInstance.tokenByIndex(i);
-            OptionPosition memory position = optionTokenInstance.optionPosition(
-                tokenId
-            );
-            if (
-                position.state == PositionState.ACTIVE &&
-                vaultInstance.strike(position.strikeId).expiry > currentTime
-            ) {
-                totalActiveAmount += position.amount;
-            }
-        }
-        return totalActiveAmount;
     }
 
     function getNFTCollections(
@@ -90,6 +60,95 @@ contract SurgeUI {
     ) external view returns (NFTCollection memory) {
         return
             _getNFTCollection(collectionAddress, oracleAddress, vaultAddress);
+    }
+
+    function _getNFTCollectionStaus(
+        address collectionAddress,
+        address oracleAddress,
+        address vaultAddress
+    ) internal view returns (NFTCollectionStaus memory) {
+        NFTCollectionStaus memory collectionStatus_;
+
+        IOracle oracleInstance = IOracle(oracleAddress);
+        (collectionStatus_.price, collectionStatus_.vol) = oracleInstance
+            .getAssetPriceAndVol(collectionAddress);
+
+        IVault vaultInstance = IVault(vaultAddress);
+
+        IVault.CollectionConfiguration
+            memory collectionConfiguration_ = vaultInstance.marketConfiguration(
+                collectionAddress
+            );
+
+        OptionToken optionTokenInstance = OptionToken(
+            collectionConfiguration_.optionToken
+        );
+
+        for (uint256 i = 0; i < optionTokenInstance.totalSupply(); ++i) {
+            uint256 tokenId = optionTokenInstance.tokenByIndex(i);
+            OptionPosition memory position = optionTokenInstance.optionPosition(
+                tokenId
+            );
+            if (
+                position.state == PositionState.ACTIVE &&
+                vaultInstance.strike(position.strikeId).expiry > block.timestamp
+            ) {
+                (int256 pPNL, int256 pDelta) = vaultInstance
+                    .positionPNLWeightedDelta(collectionAddress, tokenId);
+                collectionStatus_.PNL -= pPNL;
+                collectionStatus_.weightedDelta -= pDelta;
+                collectionStatus_.openInterest += position.amount;
+                collectionStatus_
+                    .optionTokenTotalLockedValue += optionTokenInstance
+                    .lockedValue(tokenId);
+
+                if (position.optionType == OptionType.LONG_CALL) {
+                    collectionStatus_.activeCallOptionAmount++;
+                } else {
+                    collectionStatus_.activePutOptionAmount++;
+                }
+            }
+        }
+
+        collectionStatus_.optionTokenTotalAmount = optionTokenInstance
+            .totalAmount();
+        collectionStatus_.optionTokenTotalValue = optionTokenInstance
+            .totalValue();
+        collectionStatus_.unrealizedPNL = vaultInstance.unrealizedPNL();
+
+        return collectionStatus_;
+    }
+
+    function getNFTCollectionsStaus(
+        address[] memory collectionAddresses,
+        address oracleAddress,
+        address vaultAddress
+    ) external view returns (NFTCollectionStaus[] memory) {
+        NFTCollectionStaus[] memory collectionsStaus = new NFTCollectionStaus[](
+            collectionAddresses.length
+        );
+        for (uint256 i = 0; i < collectionAddresses.length; i++) {
+            collectionsStaus[i] = _getNFTCollectionStaus(
+                collectionAddresses[i],
+                oracleAddress,
+                vaultAddress
+            );
+        }
+
+        return collectionsStaus;
+    }
+
+    function getNFTCollectionStaus(
+        address collectionAddress,
+        address oracleAddress,
+        address vaultAddress
+    ) external view returns (NFTCollectionStaus memory) {
+        return
+            _getNFTCollectionStaus(
+                collectionAddress,
+                oracleAddress,
+                vaultAddress
+            );
     }
 
     function _getVault(
