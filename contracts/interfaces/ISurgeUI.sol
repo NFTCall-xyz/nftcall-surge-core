@@ -10,15 +10,14 @@ struct NFTCollection {
 struct NFTCollectionStaus {
     uint256 price;
     uint256 vol;
+    int256 delta;
+    int256 unrealizedPNL;
     uint256 openInterest;
-    int256 PNL;
-    int256 weightedDelta;
-    uint256 optionTokenTotalAmount;
     uint256 optionTokenTotalValue;
     uint256 optionTokenTotalLockedValue;
-    uint256 activeCallOptionAmount;
-    uint256 activePutOptionAmount;
-    int256 unrealizedPNL;
+    uint256 collectionWeight;
+    uint256 callOptionAmount;
+    uint256 putOptionAmount;
 }
 
 struct VaultLPToken {

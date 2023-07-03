@@ -6,6 +6,7 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "../contracts/libraries/DataTypes.sol";
 import "./interfaces/IOracle.sol";
 import "./interfaces/IVault.sol";
+import "./interfaces/IAssetRiskCache.sol";
 import {IPricer} from "./interfaces/IPricer.sol";
 
 import "./tokens/LPToken.sol";
@@ -65,7 +66,8 @@ contract SurgeUI {
     function _getNFTCollectionStaus(
         address collectionAddress,
         address oracleAddress,
-        address vaultAddress
+        address vaultAddress,
+        address riskCacheAddress
     ) internal view returns (NFTCollectionStaus memory) {
         NFTCollectionStaus memory collectionStatus_;
 
@@ -84,37 +86,23 @@ contract SurgeUI {
             collectionConfiguration_.optionToken
         );
 
-        for (uint256 i = 0; i < optionTokenInstance.totalSupply(); ++i) {
-            uint256 tokenId = optionTokenInstance.tokenByIndex(i);
-            OptionPosition memory position = optionTokenInstance.optionPosition(
-                tokenId
-            );
-            if (
-                position.state == PositionState.ACTIVE &&
-                vaultInstance.strike(position.strikeId).expiry > block.timestamp
-            ) {
-                (int256 pPNL, int256 pDelta) = vaultInstance
-                    .positionPNLWeightedDelta(collectionAddress, tokenId);
-                collectionStatus_.PNL -= pPNL;
-                collectionStatus_.weightedDelta -= pDelta;
-                collectionStatus_.openInterest += position.amount;
-                collectionStatus_
-                    .optionTokenTotalLockedValue += optionTokenInstance
-                    .lockedValue(tokenId);
+        collectionStatus_.openInterest = optionTokenInstance.totalAmount();
+        collectionStatus_.callOptionAmount = optionTokenInstance.totalAmount(
+            OptionType.LONG_CALL
+        );
+        collectionStatus_.putOptionAmount = optionTokenInstance.totalAmount(
+            OptionType.LONG_PUT
+        );
+        collectionStatus_.optionTokenTotalValue =
+            optionTokenInstance.totalValue(OptionType.LONG_CALL) +
+            optionTokenInstance.totalValue(OptionType.LONG_PUT);
+        collectionStatus_.collectionWeight = collectionConfiguration_.weight;
 
-                if (position.optionType == OptionType.LONG_CALL) {
-                    collectionStatus_.activeCallOptionAmount++;
-                } else {
-                    collectionStatus_.activePutOptionAmount++;
-                }
-            }
-        }
-
-        collectionStatus_.optionTokenTotalAmount = optionTokenInstance
-            .totalAmount();
-        collectionStatus_.optionTokenTotalValue = optionTokenInstance
-            .totalValue();
-        collectionStatus_.unrealizedPNL = vaultInstance.unrealizedPNL();
+        IAssetRiskCache riskCacheInstance = IAssetRiskCache(riskCacheAddress);
+        (
+            collectionStatus_.delta,
+            collectionStatus_.unrealizedPNL
+        ) = riskCacheInstance.getAssetRisk(collectionAddress);
 
         return collectionStatus_;
     }
@@ -122,7 +110,8 @@ contract SurgeUI {
     function getNFTCollectionsStaus(
         address[] memory collectionAddresses,
         address oracleAddress,
-        address vaultAddress
+        address vaultAddress,
+        address riskCacheAddress
     ) external view returns (NFTCollectionStaus[] memory) {
         NFTCollectionStaus[] memory collectionsStaus = new NFTCollectionStaus[](
             collectionAddresses.length
@@ -131,7 +120,8 @@ contract SurgeUI {
             collectionsStaus[i] = _getNFTCollectionStaus(
                 collectionAddresses[i],
                 oracleAddress,
-                vaultAddress
+                vaultAddress,
+                riskCacheAddress
             );
         }
 
@@ -141,13 +131,15 @@ contract SurgeUI {
     function getNFTCollectionStaus(
         address collectionAddress,
         address oracleAddress,
-        address vaultAddress
+        address vaultAddress,
+        address riskCacheAddress
     ) external view returns (NFTCollectionStaus memory) {
         return
             _getNFTCollectionStaus(
                 collectionAddress,
                 oracleAddress,
-                vaultAddress
+                vaultAddress,
+                riskCacheAddress
             );
     }
 
