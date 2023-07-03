@@ -208,14 +208,14 @@ contract Vault is IVault, Pausable, Ownable{
             revert ZeroAmount(address(this));
         }
         if(optionType == OptionType.LONG_CALL){
-            if(strike_.strikePrice > strike_.spotPrice.mulDiv(MAXIMUM_CALL_STRIKE_PRICE_RATIO, GENERAL_UNIT, Math.Rounding.Down) 
-               || strike_.strikePrice < strike_.spotPrice.mulDiv(MINIMUM_CALL_STRIKE_PRICE_RATIO, GENERAL_UNIT, Math.Rounding.Up)){
-                revert InvalidStrikePrice(address(this), strike_.strikePrice, strike_.spotPrice);
+            if(strike_.strikePrice > strike_.entryPrice.mulDiv(MAXIMUM_CALL_STRIKE_PRICE_RATIO, GENERAL_UNIT, Math.Rounding.Down) 
+               || strike_.strikePrice < strike_.entryPrice.mulDiv(MINIMUM_CALL_STRIKE_PRICE_RATIO, GENERAL_UNIT, Math.Rounding.Up)){
+                revert InvalidStrikePrice(address(this), strike_.strikePrice, strike_.entryPrice);
             }
         } else {
-            if(strike_.strikePrice > strike_.spotPrice.mulDiv(MAXIMUM_PUT_STRIKE_PRICE_RATIO, GENERAL_UNIT, Math.Rounding.Down) 
-               || strike_.strikePrice < strike_.spotPrice.mulDiv(MINIMUM_PUT_STRIKE_PRICE_RATIO, GENERAL_UNIT, Math.Rounding.Up)){
-                revert InvalidStrikePrice(address(this), strike_.strikePrice, strike_.spotPrice);
+            if(strike_.strikePrice > strike_.entryPrice.mulDiv(MAXIMUM_PUT_STRIKE_PRICE_RATIO, GENERAL_UNIT, Math.Rounding.Down) 
+               || strike_.strikePrice < strike_.entryPrice.mulDiv(MINIMUM_PUT_STRIKE_PRICE_RATIO, GENERAL_UNIT, Math.Rounding.Up)){
+                revert InvalidStrikePrice(address(this), strike_.strikePrice, strike_.entryPrice);
             }
         }
         if(strike_.duration > MAXIMUM_DURATION || strike_.duration < MINIMUM_DURATION) {
@@ -255,9 +255,9 @@ contract Vault is IVault, Pausable, Ownable{
         if(_totalLockedAssets >= maximumLockedValue){
             return 0;
         }
-        uint256 spotPrice = IOracle(_oracle).getAssetPrice(collection);
+        uint256 entryPrice = IOracle(_oracle).getAssetPrice(collection);
         uint256 maximumOptionValue = Math.max(maximumLockedValueOfCollection - totalLockedValue, maximumLockedValue - _totalLockedAssets);
-        amount = maximumOptionValue.mulDiv(UNIT, spotPrice, Math.Rounding.Down);
+        amount = maximumOptionValue.mulDiv(UNIT, entryPrice, Math.Rounding.Down);
     }
 
     function strike(uint256 strikeId) public view override returns(Strike memory s){
@@ -270,7 +270,7 @@ contract Vault is IVault, Pausable, Ownable{
     function _calculateStrikeAndPremium(address collection, OptionType optionType, Strike memory strike_) internal view returns(uint256 premium, int256 delta){
         IPricer pricer = IPricer(_pricer);
         uint256 adjustedVol = pricer.getAdjustedVol(collection, optionType, strike_.strikePrice);
-        (premium, delta,,) = pricer.getPremiumDeltaStdVega(optionType, strike_.spotPrice, strike_.strikePrice, adjustedVol, strike_.duration);
+        (premium, delta,,) = pricer.getPremiumDeltaStdVega(optionType, strike_.entryPrice, strike_.strikePrice, adjustedVol, strike_.duration);
     }
 
     function _estimatePremium(address collection, OptionType optionType, uint256 strikePrice, uint256 expiry, uint256 amount) internal view 
@@ -280,14 +280,14 @@ contract Vault is IVault, Pausable, Ownable{
             revert ZeroAmount(address(this));
         }
         CollectionConfiguration memory config = _collections[collection];
-        strike_.spotPrice = IOracle(_oracle).getAssetPrice(collection);
+        strike_.entryPrice = IOracle(_oracle).getAssetPrice(collection);
         strike_.strikePrice = strikePrice;
         strike_.expiry = expiry;
         strike_.duration = expiry - block.timestamp;
         _validateOpenOption1(amount, optionType, strike_);
         (premium,) = _calculateStrikeAndPremium(collection, optionType, strike_);
         premium = premium.mulDiv(amount, UNIT, Math.Rounding.Up);
-        _validateOpenOption2(config, strike_.spotPrice.mulDiv(amount, UNIT, Math.Rounding.Up), premium);
+        _validateOpenOption2(config, strike_.entryPrice.mulDiv(amount, UNIT, Math.Rounding.Up), premium);
         return (premium, strike_);
     }
 
@@ -313,14 +313,14 @@ contract Vault is IVault, Pausable, Ownable{
         (premium, strike_) = _estimatePremium(collection, optionType, strikePrice, expiry, amount);
         uint256 strikeId = _nextId++;
         _strikes[strikeId] = strike_;
-        emit CreateStrike(strikeId, strike_.duration, strike_.expiry, strike_.spotPrice, strike_.strikePrice);
+        emit CreateStrike(strikeId, strike_.duration, strike_.expiry, strike_.entryPrice, strike_.strikePrice);
         //mint option token
         OptionToken optionToken = OptionToken( _collections[collection].optionToken);
         positionId = optionToken.openPosition(_msgSender(), onBehalfOf, optionType, strikeId, amount, maximumPremium);
         _totalLockedAssets += optionToken.lockedValue(positionId);
         OpenPositionEventParameters memory eventParameters;
         eventParameters.expiration = strike_.expiry;
-        eventParameters.spotPrice = strike_.spotPrice;
+        eventParameters.entryPrice = strike_.entryPrice;
         eventParameters.strikePrice = strike_.strikePrice;
         eventParameters.optionType = optionType;
         eventParameters.amount = amount;
@@ -349,7 +349,7 @@ contract Vault is IVault, Pausable, Ownable{
         tradeParameters.amount = position.amount;
         strike_.duration = strike_.expiry - block.timestamp;
         tradeParameters.expiry = strike_.expiry;
-        strike_.spotPrice = IOracle(_oracle).getAssetPrice(collection);
+        strike_.entryPrice = IOracle(_oracle).getAssetPrice(collection);
         (premium, delta) = _calculateStrikeAndPremium(collection, position.optionType, strike_);
         premium = premium.mulDiv(position.amount, UNIT, Math.Rounding.Up);
         if(premium > position.maximumPremium){
@@ -384,7 +384,7 @@ contract Vault is IVault, Pausable, Ownable{
         OptionToken optionToken = OptionToken(_collections[collection].optionToken);
         OptionPosition memory position = optionToken.optionPosition(positionId);
         Strike memory strike_ = _strikes[position.strikeId];
-        strike_.spotPrice = IOracle(_oracle).getAssetPrice(collection);
+        strike_.entryPrice = IOracle(_oracle).getAssetPrice(collection);
         strike_.duration = strike_.expiry - block.timestamp;
         uint256 premium;
         (premium, weightedDelta) = _calculateStrikeAndPremium(collection, position.optionType, strike_);
@@ -417,11 +417,11 @@ contract Vault is IVault, Pausable, Ownable{
         _unrealizedPremium -= position.premium;
         _realizedPNL += int256(position.premium);
 
-        uint256 currentPrice = IOracle(_oracle).getAssetPrice(collection);
+        uint256 settlementPrice = IOracle(_oracle).getAssetPrice(collection);
         TradeParameters memory tradeParameters;
         tradeParameters.optionType = position.optionType;
         tradeParameters.tradeType = TradeType.CLOSE;
-        tradeParameters.spotPrice = strike_.spotPrice;
+        tradeParameters.entryPrice = strike_.entryPrice;
         tradeParameters.strikePrice = strike_.strikePrice;
         tradeParameters.duration = strike_.duration;
         tradeParameters.expiry = strike_.expiry;
@@ -432,15 +432,15 @@ contract Vault is IVault, Pausable, Ownable{
         delete _strikes[position.strikeId];
         emit DestoryStrike(position.strikeId);
         uint256 fee;
-        (profit, fee) = _calculateExerciseProfit(position.optionType, currentPrice, strike_.strikePrice, position.amount);
+        (profit, fee) = _calculateExerciseProfit(position.optionType, settlementPrice, strike_.strikePrice, position.amount);
         if(profit != 0){
             _realizedPNL -= int256(profit + fee);
-            emit ExercisePosition(to, collection, positionId, profit, fee);
+            emit ExercisePosition(to, collection, positionId, profit, fee, settlementPrice);
             IERC20(_asset).safeTransferFrom(_lpToken, _backstopPool, fee);
             IERC20(_asset).safeTransferFrom(_lpToken, to, profit);
         }
         else{
-            emit ExpirePosition(to, collection, positionId);
+            emit ExpirePosition(to, collection, positionId, settlementPrice);
         }
         uint256 price = LPToken(_lpToken).convertToAssets(HIGH_PRECISION_UNIT);
         emit UpdateLPTokenPrice(_lpToken, price);
@@ -476,25 +476,25 @@ contract Vault is IVault, Pausable, Ownable{
         _closePendingPosition(collection, positionId);
     }
 
-    function _calculateExerciseProfit(OptionType optionType, uint256 currentPrice, uint256 strikePrice, uint256 amount) internal view returns(uint256, uint256){
+    function _calculateExerciseProfit(OptionType optionType, uint256 settlementPrice, uint256 strikePrice, uint256 amount) internal view returns(uint256, uint256){
         uint256 profit;
         if(optionType == OptionType.LONG_CALL){
-            if(currentPrice <= strikePrice){
+            if(settlementPrice <= strikePrice){
                 return (0, 0);
             }
-            profit = currentPrice - strikePrice;
+            profit = settlementPrice - strikePrice;
             if(profit > strikePrice){
                 profit = strikePrice;
             }
             profit = profit.mulDiv(amount, UNIT, Math.Rounding.Down);
         }
         else{
-            if(currentPrice >= strikePrice) {
+            if(settlementPrice >= strikePrice) {
                 return (0, 0);
             }
-            profit = (strikePrice - currentPrice).mulDiv(amount, UNIT, Math.Rounding.Down);
+            profit = (strikePrice - settlementPrice).mulDiv(amount, UNIT, Math.Rounding.Down);
         }
-        uint256 fee = currentPrice.mulDiv(amount, UNIT, Math.Rounding.Down).mulDiv(FEE_RATIO, GENERAL_UNIT, Math.Rounding.Up);
+        uint256 fee = settlementPrice.mulDiv(amount, UNIT, Math.Rounding.Down).mulDiv(FEE_RATIO, GENERAL_UNIT, Math.Rounding.Up);
         uint256 maximumFee = profit.mulDiv(PROFIT_FEE_RATIO, GENERAL_UNIT, Math.Rounding.Up);
         fee = Math.min(fee, maximumFee);
         return (profit - fee, fee);

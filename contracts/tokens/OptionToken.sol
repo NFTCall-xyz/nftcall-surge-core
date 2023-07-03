@@ -145,7 +145,7 @@ contract OptionToken is IOptionToken, ERC721Enumerable, Ownable, SimpleInitializ
             revert NonexistentPosition(address(this), positionId);
         }
         if(position.optionType == OptionType.LONG_CALL) {
-            return IVault(_vault).strike(position.strikeId).spotPrice.mulDiv(position.amount, UNIT, Math.Rounding.Up);
+            return IVault(_vault).strike(position.strikeId).entryPrice.mulDiv(position.amount, UNIT, Math.Rounding.Up);
         } else {
             return IVault(_vault).strike(position.strikeId).strikePrice.mulDiv(position.amount, UNIT, Math.Rounding.Up);
         }

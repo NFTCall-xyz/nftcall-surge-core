@@ -8,7 +8,7 @@ enum TradeType {
 }
 
 struct Strike {
-    uint256 spotPrice;
+    uint256 entryPrice;
     uint256 strikePrice;
     uint256 duration;
     uint256 expiry;
@@ -23,7 +23,7 @@ interface IVault {
         address optionToken;
     }
 
-    event CreateStrike(uint256 indexed strikeId, uint256 duration, uint256 expiration, uint256 spotPrice, uint256 strikePrice);
+    event CreateStrike(uint256 indexed strikeId, uint256 duration, uint256 expiration, uint256 entryPrice, uint256 strikePrice);
     event DestoryStrike(uint256 indexed strikeId);
     event CreateMarket(address indexed collection, uint32 weight, address optionToken);
     event KeeperAddressUpdated(address indexed keeperAddress);
@@ -38,7 +38,7 @@ interface IVault {
     struct OpenPositionEventParameters {
         OptionType optionType;
         uint256 expiration;
-        uint256 spotPrice;
+        uint256 entryPrice;
         uint256 strikePrice;
         uint256 amount;
         uint256 premium;
@@ -47,8 +47,8 @@ interface IVault {
 
     event OpenPosition(address caller, address indexed receiver, address indexed collection, uint256 indexed positionId, OpenPositionEventParameters parameters);
     event ActivatePosition(address indexed owner, address indexed collection, uint256 indexed positionId, uint256 premium, uint256 excessPremium, int256 delta);
-    event ExercisePosition(address indexed owner, address indexed collection, uint256 indexed positionId, uint256 revenue, uint256 exerciseFee);
-    event ExpirePosition(address indexed owner, address indexed collection, uint256 indexed positionId);
+    event ExercisePosition(address indexed owner, address indexed collection, uint256 indexed positionId, uint256 revenue, uint256 exerciseFee, uint256 settlementPrice);
+    event ExpirePosition(address indexed owner, address indexed collection, uint256 indexed positionId, uint256 settlementPrice);
     event CancelPosition(address indexed owner, address indexed collection, uint256 indexed positionId, uint256 returnedPremium);
     event FailPosition(address indexed owner, address indexed collection, uint256 indexed positionId, uint256 returnedPremium);
 
@@ -98,7 +98,7 @@ interface IVault {
     function profitFeeRatio() external view returns(uint256);
 
     error ZeroAmount(address thrower);
-    error InvalidStrikePrice(address thrower, uint strikePrice, uint spotPrice);
+    error InvalidStrikePrice(address thrower, uint strikePrice, uint entryPrice);
     error InvalidDuration(address thrower, uint duration);
     error InsufficientLiquidityForCollection(address thrower, address collection, uint256 totalLockedAssets, uint256 amountToBeLocked, uint256 vaultLiquidity);
     error InsufficientLiquidity(address thrower, uint256 totalLockedAssets, uint256 amountToBeLocked, uint256 vaultLiquidity);
