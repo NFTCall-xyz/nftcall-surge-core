@@ -34,7 +34,7 @@
       "address": "0x39aB4Aabd99062FF3dE3487E0E9925cD294f4651"
     },
     "arbitrumGoerli": {
-      "address": "0xc2d7d46d9Ec3f839eEeCdc60F1A3DA081De96798"
+      "address": "0x7746Ad0C8f65a0DFBFA32aC960D518bd97a147b5"
     }
   },
   "BlackScholes": {
@@ -45,7 +45,7 @@
       "address": "0x654113e5f95ebB9D1698E9C22e9665B2722Eaa44"
     },
     "arbitrumGoerli": {
-      "address": "0x9fcdD6FAf229a211aAeA0df6AbFE4548a90960cB"
+      "address": "0xaCF364A4d015c4e3939fF2B7512FA952893C9345"
     }
   },
   "OptionPricer": {
@@ -56,7 +56,7 @@
       "address": "0x571320756A0f2DBffE7747eB1e71A70322172331"
     },
     "arbitrumGoerli": {
-      "address": "0x2b9fB1496963C2dbf7217b0d453666F2755688b5"
+      "address": "0x02F6BE044970aF8CFEAb29364D2ecBe1b5570586"
     }
   },
   "AssetRiskCache": {
@@ -67,7 +67,7 @@
       "address": "0xb33C4d99394641B5A6f08018298fEc88c87a6BA0"
     },
     "arbitrumGoerli": {
-      "address": "0xf10bb611DD2ea5029c7FCEe5016eC2B9EE9EEfDd"
+      "address": "0x88d5459211A77fb9FF24f5952E8Bc724459c4Ed7"
     }
   },
   "Reserve": {
@@ -78,7 +78,7 @@
       "address": "0x4a0C96b637adddBb5CCF2C0280A14429467ED215"
     },
     "arbitrumGoerli": {
-      "address": "0x07AAc1A3384FaBb240c7CCd7eF0708a682B39bbB"
+      "address": "0x02F397B9F11C376a0aA47989a229ca1f297Aa0cF"
     }
   },
   "Vault": {
@@ -89,7 +89,7 @@
       "address": "0xfBAdd629393258F2410242CA815E52280A9cf3e1"
     },
     "arbitrumGoerli": {
-      "address": "0xE7902FF99A2a40a9e3C756c1A309964a82344B52"
+      "address": "0x6c1D390c497DCbaC82350C6340F31fAfe20c742c"
     }
   },
   "operator": {
@@ -124,7 +124,7 @@
       "address": "0x68B1D87F95878fE05B998F19b66F4baba5De1aed"
     },
     "arbitrumGoerli": {
-      "address": "0x50D28d80Bd4103c3013245B88BC4f91D4B4909aa"
+      "address": "0xBA220395F336F058F807986cb0c5FD65f85a5bE4"
     }
   },
   "BackstopPool": {
@@ -132,7 +132,7 @@
       "address": "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6"
     },
     "arbitrumGoerli": {
-      "address": "0xD704f2C7b4b0AcE5f7304c4450fdb073236666B7"
+      "address": "0xDd98cF6f5B6aE19fE9aa4735461742976ca06861"
     }
   }
 }
