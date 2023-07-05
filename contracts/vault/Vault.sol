@@ -256,7 +256,7 @@ contract Vault is IVault, Pausable, Ownable{
             return 0;
         }
         uint256 entryPrice = IOracle(_oracle).getAssetPrice(collection);
-        uint256 maximumOptionValue = Math.max(maximumLockedValueOfCollection - totalLockedValue, maximumLockedValue - _totalLockedAssets);
+        uint256 maximumOptionValue = Math.min(maximumLockedValueOfCollection - totalLockedValue, maximumLockedValue - _totalLockedAssets);
         amount = maximumOptionValue.mulDiv(UNIT, entryPrice, Math.Rounding.Down);
     }
 
