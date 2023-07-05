@@ -41,8 +41,8 @@ export const bigNumber = (number: number, decimals: number = 0) => {
 }
 
 export const getMarkets = async () => {
-    const optionTokens = Object.keys((await getMarketDb().get(`OptionToken.${DRE.network.name}`)).value());
-    return optionTokens;
+    const markets = Object.keys((await getMarketDb().get(`OptionToken.${DRE.network.name}`)).value());
+    return markets;
 }
 
 export const sleep = (second: number) => {
