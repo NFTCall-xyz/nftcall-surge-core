@@ -47,6 +47,17 @@ export const cloesOptions = async (market: string) => {
     console.log('PositionIds closed');
 }
 
+const needUpdate = (oldPNL: BigNumber, oldDelta: BigNumber, newPNL: BigNumber, newDelta: BigNumber) => {
+    const dPNL = newPNL.sub(oldPNL);
+    const dDelta = newDelta.sub(oldDelta);
+    if(dPNL.abs().mul(100).gt(oldPNL.abs()) || dDelta.abs().mul(100).gt(oldDelta.abs())) {
+        return true;
+    }
+    else {
+        return false;
+    }
+}
+
 export const updateRisk = async (market: string) => {
     const keeperHelper = await getKeeperHelper();
     const nft = await getAddress(market);
@@ -75,7 +86,7 @@ export const updateRisk = async (market: string) => {
         newPNL = risk.PNL;
         newDelta = risk.weightedDelta.mul(bigNumber(1, 18)).div(await optionToken['totalAmount()']());
     }
-    if((!oldPNL.eq(newPNL)) || (!oldDelta.eq(newDelta))) {
+    if( needUpdate(oldPNL, oldDelta, newPNL, newDelta) ) {
         await waitTx(await keeperHelper.updateCollectionRisk(nft, newDelta, newPNL));
         console.log('Updated delta and PNL');
         return true;
