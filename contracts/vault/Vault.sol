@@ -11,7 +11,7 @@ import {StorageSlot} from "@openzeppelin/contracts/utils/StorageSlot.sol";
 import {GENERAL_UNIT, DECIMALS, UNIT, HIGH_PRECISION_UNIT} from "../libraries/DataTypes.sol";
 import {LPToken} from "../tokens/LPToken.sol";
 import {OptionType, OptionPosition, PositionState, IOptionToken} from "../interfaces/IOptionToken.sol";
-import {TradeParameters, IOracle} from "../interfaces/IOracle.sol";
+import {IOracle} from "../interfaces/IOracle.sol";
 import {IPremium, PremiumVars} from "../interfaces/IPremium.sol";
 import {IPricer} from "../interfaces/IPricer.sol";
 import {IAssetRiskCache} from "../interfaces/IAssetRiskCache.sol";

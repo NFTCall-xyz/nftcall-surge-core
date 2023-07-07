@@ -4,16 +4,6 @@ pragma solidity ^0.8.0;
 import {OptionType} from "./IOptionToken.sol";
 import {TradeType} from "./IVault.sol";
 
-struct TradeParameters {
-  OptionType optionType;
-  TradeType tradeType;
-  uint256 entryPrice;
-  uint256 strikePrice;
-  uint256 duration;
-  uint256 expiry;
-  uint256 amount;
-}
-
 /************
 @title IPriceOracle interface
 @notice Interface for the Aave price oracle.*/
