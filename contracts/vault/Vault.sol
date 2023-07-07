@@ -273,15 +273,22 @@ contract Vault is IVault, Pausable, Ownable{
         (uint256 call, uint256 put) = pricer.optionPrices(strike_.entryPrice, strike_.strikePrice, adjustedVol, strike_.duration);
         if(optionType == OptionType.LONG_CALL){
             premium = call;
+            (uint256 buybackPremium, ) = pricer.optionPrices(strike_.entryPrice, strike_.strikePrice + strike_.entryPrice, adjustedVol, strike_.duration);
+            premium = premium - buybackPremium;
         } else {
             premium = put;
         }
     }
 
-    function _premiumAndDelta(address collection, OptionType optionType, uint256 strikePrice, uint256 duration) internal view returns(uint256 premium, int256 delta){
+    function _premiumAndDelta(address collection, OptionType optionType, uint256 entryPrice, uint256 strikePrice, uint256 duration) internal view returns(uint256 premium, int256 delta){
         IPricer pricer = IPricer(_pricer);
         (uint256 spotPrice, uint vol) = IOracle(_oracle).getAssetPriceAndVol(collection);
         (premium, delta,,) = pricer.getPremiumDeltaStdVega(optionType, spotPrice, strikePrice, vol, duration);
+        if(optionType == OptionType.LONG_CALL){
+            (uint256 buybackPremium, int256 buybackDelta, ,) = pricer.getPremiumDeltaStdVega(OptionType.LONG_CALL, spotPrice, strikePrice + entryPrice, vol, duration);
+            premium = premium - buybackPremium;
+            delta = delta - buybackDelta;
+        }
     }
 
     function _estimatePremium(address collection, OptionType optionType, uint256 strikePrice, uint256 expiry, uint256 amount) internal view 
@@ -363,7 +370,7 @@ contract Vault is IVault, Pausable, Ownable{
         else{
             _unrealizedPremium += premium;
             uint256 unadjustedPremium;
-            (unadjustedPremium, delta) = _premiumAndDelta(collection, position.optionType, strike_.strikePrice, strike_.duration);
+            (unadjustedPremium, delta) = _premiumAndDelta(collection, position.optionType, strike_.entryPrice, strike_.strikePrice, strike_.duration);
             (int256 _collectionDelta, int256 _collectionPNL) = IAssetRiskCache(_riskCache).getAssetRisk(collection);
             _collectionDelta = _collectionDelta.iMulDiv(int256(optionToken.totalAmount()), UNIT, Math.Rounding.Down);
             _collectionDelta -= delta.iMulDiv(int256(position.amount), UNIT, Math.Rounding.Down);
@@ -392,7 +399,7 @@ contract Vault is IVault, Pausable, Ownable{
         OptionPosition memory position = optionToken.optionPosition(positionId);
         Strike memory strike_ = _strikes[position.strikeId];
         uint256 premium;
-        (premium, weightedDelta) = _premiumAndDelta(collection, position.optionType, strike_.strikePrice, strike_.expiry - block.timestamp);
+        (premium, weightedDelta) = _premiumAndDelta(collection, position.optionType, strike_.entryPrice, strike_.strikePrice, strike_.expiry - block.timestamp);
         unrealizePNL = int256(premium.mulDiv(position.amount, UNIT, Math.Rounding.Up)) - int256(position.premium);
         weightedDelta = weightedDelta.iMulDiv(int256(position.amount), UNIT, Math.Rounding.Up);
     }
@@ -423,21 +430,12 @@ contract Vault is IVault, Pausable, Ownable{
         _realizedPNL += int256(position.premium);
 
         uint256 settlementPrice = IOracle(_oracle).getAssetPrice(collection);
-        TradeParameters memory tradeParameters;
-        tradeParameters.optionType = position.optionType;
-        tradeParameters.tradeType = TradeType.CLOSE;
-        tradeParameters.entryPrice = strike_.entryPrice;
-        tradeParameters.strikePrice = strike_.strikePrice;
-        tradeParameters.duration = strike_.duration;
-        tradeParameters.expiry = strike_.expiry;
-        tradeParameters.amount = position.amount;
-        // IOracle(_oracle).update(address(this), collection, tradeParameters);
         address to = optionToken.ownerOf(positionId);
         optionToken.closePosition(positionId);
         delete _strikes[position.strikeId];
         emit DestoryStrike(position.strikeId);
         uint256 fee;
-        (profit, fee) = _calculateExerciseProfit(position.optionType, settlementPrice, strike_.strikePrice, position.amount);
+        (profit, fee) = _calculateExerciseProfit(position.optionType, settlementPrice, strike_.entryPrice, strike_.strikePrice, position.amount);
         if(profit != 0){
             _realizedPNL -= int256(profit + fee);
             emit ExercisePosition(to, collection, positionId, profit, fee, settlementPrice);
@@ -481,15 +479,15 @@ contract Vault is IVault, Pausable, Ownable{
         _closePendingPosition(collection, positionId);
     }
 
-    function _calculateExerciseProfit(OptionType optionType, uint256 settlementPrice, uint256 strikePrice, uint256 amount) internal view returns(uint256, uint256){
+    function _calculateExerciseProfit(OptionType optionType, uint256 settlementPrice, uint256 entryPrice, uint256 strikePrice, uint256 amount) internal view returns(uint256, uint256){
         uint256 profit;
         if(optionType == OptionType.LONG_CALL){
             if(settlementPrice <= strikePrice){
                 return (0, 0);
             }
             profit = settlementPrice - strikePrice;
-            if(profit > strikePrice){
-                profit = strikePrice;
+            if(profit > entryPrice){
+                profit = entryPrice;
             }
             profit = profit.mulDiv(amount, UNIT, Math.Rounding.Down);
         }

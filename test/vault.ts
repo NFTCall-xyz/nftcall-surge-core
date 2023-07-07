@@ -189,7 +189,7 @@ makeSuite('Vault', (testEnv) => {
     expect(events).is.not.undefined;
     const openEvent = events?.filter(event => event.topics[0] == vault.interface.getEventTopic('OpenPosition'))[0];
     const estimatedPremium = openEvent.args['parameters']['premium'];
-    expect(estimatedPremium).to.be.equal(BigNumber.from("778208870944333238").mul(amount).add(bigNumber(1,18)).sub(1).div(bigNumber(1, 18)));
+    expect(estimatedPremium).to.be.equal(BigNumber.from("778208807326428188").mul(amount).add(bigNumber(1,18)).sub(1).div(bigNumber(1, 18)));
     const vaultBalance = await eth.balanceOf(vault.address);
     expect(vaultBalance).to.be.equal(premium.add(keeperFee));
     
@@ -242,7 +242,7 @@ makeSuite('Vault', (testEnv) => {
     expect(events).is.not.undefined;
     const openEvent = events?.filter(event => event.topics[0] == vault.interface.getEventTopic('OpenPosition'))[0];
     const estimatedPremium = openEvent.args['parameters']['premium'];
-    expect(estimatedPremium).to.be.equal(BigNumber.from("941440058253464712").mul(amount).add(bigNumber(1,18)).sub(1).div(bigNumber(1, 18)));
+    expect(estimatedPremium).to.be.equal(BigNumber.from("941439689980872262").mul(amount).add(bigNumber(1,18)).sub(1).div(bigNumber(1, 18)));
     const positionIds = await keeperHelper.getPendingOptions(nft);
     let state = await optionToken.optionPositionState(positionIds[0]);
     expect(state).to.be.equal(1); // PENDING
