@@ -253,6 +253,26 @@ export const initializeLPToken = async(maximumTotalAssets: BigNumber) => {
     await waitTx(await lpToken.initialize(vault.address, maximumTotalAssets));
 }
 
+export const initializePricer = async() => {
+    const pricer = await getPricer();
+    if(pricer === undefined){
+        throw Error('OptionPricer is not deployed');
+    }
+    const vault = await getVault();
+    if(vault === undefined) {
+        throw Error('Vault is not deployed');
+    }
+    const riskCache = await getRiskCache();
+    if(riskCache === undefined) {
+        throw Error('RiskCache is not deployed');
+    }
+    const oracle = await getOracle();
+    if(oracle === undefined) {
+        throw Error('Oracle is not deployed');
+    }
+    await waitTx(await pricer.initialize(vault.address, riskCache.address, oracle.address));
+}
+
 export const initializeOptionToken = async(marketName: string) => {
     const optionToken = await getOptionToken(marketName);
     if(optionToken === undefined){

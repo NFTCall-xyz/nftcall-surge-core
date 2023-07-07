@@ -271,9 +271,16 @@ contract Vault is IVault, Pausable, Ownable{
         }
     }
 
-    function _adjustedPremium(address collection, OptionType optionType, Strike memory strike_) internal view returns(uint256 premium){
+    function _adjustedPremium(address collection, OptionType optionType, Strike memory strike_, uint256 amount) internal view returns(uint256 premium){
         IPricer pricer = IPricer(_pricer);
-        uint256 adjustedVol = pricer.getAdjustedVol(collection, optionType, strike_.strikePrice);
+        uint256 lockedValue;
+        if(optionType == OptionType.LONG_CALL){
+            lockedValue = strike_.entryPrice.mulDiv(amount, UNIT, Math.Rounding.Up);
+        }
+        else {
+            lockedValue = strike_.strikePrice.mulDiv(amount, UNIT, Math.Rounding.Up);
+        }
+        uint256 adjustedVol = pricer.getAdjustedVol(collection, optionType, strike_.strikePrice, lockedValue);
         (uint256 call, uint256 put) = pricer.optionPrices(strike_.entryPrice, strike_.strikePrice, adjustedVol, strike_.duration);
         if(optionType == OptionType.LONG_CALL){
             premium = call;
@@ -307,7 +314,7 @@ contract Vault is IVault, Pausable, Ownable{
         strike_.expiry = expiry;
         strike_.duration = expiry - block.timestamp;
         _validateOpenOption1(amount, optionType, strike_);
-        premium = _adjustedPremium(collection, optionType, strike_);
+        premium = _adjustedPremium(collection, optionType, strike_, amount);
         premium = premium.mulDiv(amount, UNIT, Math.Rounding.Up);
         _validateOpenOption2(config, strike_.entryPrice.mulDiv(amount, UNIT, Math.Rounding.Up), premium);
         return (premium, strike_);
@@ -365,7 +372,7 @@ contract Vault is IVault, Pausable, Ownable{
         Strike memory strike_ = _strikes[position.strikeId];
         strike_.duration = strike_.expiry - block.timestamp;
         strike_.entryPrice = IOracle(_oracle).getAssetPrice(collection);
-        premium = _adjustedPremium(collection, position.optionType, strike_);
+        premium = _adjustedPremium(collection, position.optionType, strike_, position.amount);
         premium = premium.mulDiv(position.amount, UNIT, Math.Rounding.Up);
         if(premium > position.maximumPremium){
             emit FailPosition(optionToken.ownerOf(positionId), collection, positionId, position.maximumPremium);
