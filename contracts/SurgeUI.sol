@@ -158,6 +158,10 @@ contract SurgeUI {
             ERC20 wETHInstance = ERC20(wETHAddress);
 
             vault_.lpToken.balance = lpTokenInstance.balanceOf(userAddress);
+            vault_.lpToken.allowance = lpTokenInstance.allowance(
+                userAddress,
+                vaultAddress
+            );
             vault_.lpToken.wETHBalance = wETHInstance.balanceOf(userAddress);
             vault_.lpToken.wETHAllowance = wETHInstance.allowance(
                 userAddress,
