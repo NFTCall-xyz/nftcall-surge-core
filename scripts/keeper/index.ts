@@ -11,7 +11,8 @@ export const activateOptions = async (market: string) => {
     if(keeperHelper === undefined || vault === undefined) {
         throw Error('KeeperHelper is not deployed');
     }
-    const positionIds = await keeperHelper.getPendingOptions(nft);
+    const positionIds = (await keeperHelper.getPendingOptions(nft));/*.filter(
+        (el, index, arr) => { return !(el.eq(BigNumber.from(0)));});*/
     console.log('👉 activating positionIds:', positionIds);
     if(positionIds.length > 0) {
         try {
@@ -31,6 +32,7 @@ export const activateOptions = async (market: string) => {
         }
     }
     console.log('PositionIds activated');
+    return positionIds.length;
 }
 
 export const cloesOptions = async (market: string) => {
@@ -39,12 +41,17 @@ export const cloesOptions = async (market: string) => {
     if(keeperHelper === undefined) {
         throw Error('KeeperHelper is not deployed');
     }
-    const positionIds = await keeperHelper.getExpiredOptions(nft);
+    const positionIds = (await keeperHelper.getExpiredOptions(nft));/*.filter(
+        (el, index, arr) => { return !(el.eq(BigNumber.from(0)));}
+    );*/
     console.log('👉 closing positionIds:', positionIds);
     if(positionIds.length > 0) {
-        await waitTx(await keeperHelper.batchCloseOptions(nft, positionIds));
+        for(const positionId of positionIds){
+            await waitTx(await keeperHelper.batchCloseOptions(nft, [positionId]));
+        }
     }
     console.log('PositionIds closed');
+    return positionIds.length;
 }
 
 const needUpdate = (oldPNL: BigNumber, oldDelta: BigNumber, newPNL: BigNumber, newDelta: BigNumber) => {
@@ -58,7 +65,7 @@ const needUpdate = (oldPNL: BigNumber, oldDelta: BigNumber, newPNL: BigNumber, n
     }
 }
 
-export const updateRisk = async (market: string) => {
+export const updateRisk = async (market: string, forced: boolean) => {
     const keeperHelper = await getKeeperHelper();
     const nft = await getAddress(market);
     if(keeperHelper === undefined) {
@@ -75,7 +82,9 @@ export const updateRisk = async (market: string) => {
     oldDelta = oldRisk.delta;
     let newPNL = BigNumber.from(0);
     let newDelta = BigNumber.from(0);
-    const positionIds = await keeperHelper.getActiveOptions(nft);
+    const positionIds = (await keeperHelper.getActiveOptions(nft));/*.filter(
+        (el, index, arr) => { return !(el.eq(BigNumber.from(0)));}
+        );*/
     console.log('👉 updating delta and PNL of positionIds:', positionIds);
     if(positionIds.length > 0) {
         const optionToken = await getOptionToken(market);
@@ -86,7 +95,7 @@ export const updateRisk = async (market: string) => {
         newPNL = risk.PNL;
         newDelta = risk.weightedDelta.mul(bigNumber(1, 18)).div(await optionToken['totalAmount()']());
     }
-    if( needUpdate(oldPNL, oldDelta, newPNL, newDelta) ) {
+    if( needUpdate(oldPNL, oldDelta, newPNL, newDelta) || forced ) {
         await waitTx(await keeperHelper.updateCollectionRisk(nft, newDelta, newPNL));
         console.log('Updated delta and PNL');
         return true;
@@ -114,8 +123,8 @@ export const resetRisk = async (market: string) => {
 }
 
 export const processMarket = async (market: string) => {
-    await cloesOptions(market);
-    const needToUpdatePNL = await updateRisk(market);
+    const closedPositions = await cloesOptions(market);
+    const needToUpdatePNL = await updateRisk(market, closedPositions > 0);
     await activateOptions(market);
     return needToUpdatePNL;
 }
