@@ -60,10 +60,10 @@ contract Vault is IVault, Pausable, Ownable{
     uint256 public override constant MAXIMUM_PUT_STRIKE_PRICE_RATIO = GENERAL_UNIT * 90 / 100; // 90%
     uint256 public override constant MINIMUM_PUT_STRIKE_PRICE_RATIO = GENERAL_UNIT * 50 / 100; // 50%
     uint256 public override constant KEEPER_FEE = 5 * 10**13; // 0.00005 ETH
-    uint256 public override constant TIME_SCALE = 1;
+    uint256 public override constant TIME_SCALE = 24 * 3;
 
-    uint256 public override constant MINIMUM_DURATION = 3 days;
-    uint256 public override constant MAXIMUM_DURATION = 30 days;
+    uint256 public override constant MINIMUM_DURATION = 3 days / TIME_SCALE;
+    uint256 public override constant MAXIMUM_DURATION = 30 days / TIME_SCALE;
 
     constructor (address asset, address lpToken, address oracle, address pricer, address riskCache, address reserve_, address backstopPool_)
         Ownable()
@@ -282,12 +282,13 @@ contract Vault is IVault, Pausable, Ownable{
             lockedValue = strike_.strikePrice.mulDiv(amount, UNIT, Math.Rounding.Up);
         }
         uint256 adjustedVol = pricer.getAdjustedVol(collection, optionType, strike_.strikePrice, lockedValue);
-        (uint256 call, uint256 put) = pricer.optionPrices(strike_.entryPrice, strike_.strikePrice, adjustedVol, strike_.duration);
+        (uint256 call, uint256 put) = pricer.optionPrices(strike_.entryPrice, strike_.strikePrice, adjustedVol, strike_.duration * TIME_SCALE);
         if(optionType == OptionType.LONG_CALL){
             premium = call;
-            (uint256 buybackPremium, ) = pricer.optionPrices(strike_.entryPrice, strike_.strikePrice + strike_.entryPrice, adjustedVol, strike_.duration);
+            (uint256 buybackPremium, ) = pricer.optionPrices(strike_.entryPrice, strike_.strikePrice + strike_.entryPrice, adjustedVol, strike_.duration * TIME_SCALE);
             premium = premium - buybackPremium;
-        } else {
+        } 
+        else {
             premium = put;
         }
     }
@@ -295,9 +296,9 @@ contract Vault is IVault, Pausable, Ownable{
     function _premiumAndDelta(address collection, OptionType optionType, uint256 entryPrice, uint256 strikePrice, uint256 duration) internal view returns(uint256 premium, int256 delta){
         IPricer pricer = IPricer(_pricer);
         (uint256 spotPrice, uint vol) = IOracle(_oracle).getAssetPriceAndVol(collection);
-        (premium, delta,,) = pricer.getPremiumDeltaStdVega(optionType, spotPrice, strikePrice, vol, duration);
+        (premium, delta,,) = pricer.getPremiumDeltaStdVega(optionType, spotPrice, strikePrice, vol, duration * TIME_SCALE);
         if(optionType == OptionType.LONG_CALL){
-            (uint256 buybackPremium, int256 buybackDelta, ,) = pricer.getPremiumDeltaStdVega(OptionType.LONG_CALL, spotPrice, strikePrice + entryPrice, vol, duration);
+            (uint256 buybackPremium, int256 buybackDelta, ,) = pricer.getPremiumDeltaStdVega(OptionType.LONG_CALL, spotPrice, strikePrice + entryPrice, vol, duration * TIME_SCALE);
             premium = premium - buybackPremium;
             delta = delta - buybackDelta;
         }
@@ -312,8 +313,9 @@ contract Vault is IVault, Pausable, Ownable{
         CollectionConfiguration memory config = _collections[collection];
         strike_.entryPrice = IOracle(_oracle).getAssetPrice(collection);
         strike_.strikePrice = strikePrice;
-        strike_.expiry = expiry;
-        strike_.duration = expiry - block.timestamp;
+        // strike_.expiry = expiry;
+        strike_.duration = (expiry - block.timestamp) / TIME_SCALE;
+        strike_.expiry = block.timestamp + strike_.duration;
         _validateOpenOption1(amount, optionType, strike_);
         premium = _adjustedPremium(collection, optionType, strike_, amount);
         premium = premium.mulDiv(amount, UNIT, Math.Rounding.Up);
@@ -389,6 +391,7 @@ contract Vault is IVault, Pausable, Ownable{
         premium = _adjustedPremium(collection, position.optionType, strike_, position.amount);
         premium = premium.mulDiv(position.amount, UNIT, Math.Rounding.Up);
         if(premium > position.maximumPremium){
+            console.log('failed: premium: %s, maximumPremium: %s', premium, position.maximumPremium);
             emit FailPosition(optionToken.ownerOf(positionId), collection, positionId, position.maximumPremium);
             _closePendingPosition(collection, positionId);
         }

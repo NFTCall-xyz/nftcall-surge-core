@@ -25,7 +25,7 @@ contract LPToken is ILPToken, ERC4626, Ownable, SimpleInitializable {
     uint256 private _totalAssets = 0;
     uint256 public constant MAXIMUM_WITHDRAW_RATIO = GENERAL_UNIT * 50 / 100; // 50%
     uint256 public constant WITHDRAW_FEE_RATIO = GENERAL_UNIT * 3 / 1000; // 0.3%
-    uint256 public constant LOCK_PERIOD = 3 days;
+    uint256 public constant LOCK_PERIOD = 3 days / 24 / 3;
     
     constructor(address assetAddress, string memory name, string memory symbol) 
       ERC4626(IERC20(assetAddress)) 
