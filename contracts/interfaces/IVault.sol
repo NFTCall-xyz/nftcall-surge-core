@@ -61,6 +61,7 @@ interface IVault {
     function MINIMUM_PUT_STRIKE_PRICE_RATIO() external view returns(uint256);
     function MAXIMUM_DURATION() external view returns(uint256);
     function MINIMUM_DURATION() external view returns(uint256);
+    function TIME_SCALE() external view returns(uint256);
     
     function keeper() external view returns(address);
     function setKeeper(address keeperAddress) external;

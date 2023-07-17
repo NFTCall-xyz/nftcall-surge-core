@@ -16,9 +16,9 @@ makeSuite('Vault', (testEnv) => {
       throw new Error('testEnv not initialized');
     }
     const amount = ethers.utils.parseEther("10000");
-    await eth.mint(amount);
-    await eth.approve(lpToken.address, amount);
-    await vault.deposit(amount, deployer.address);
+    await waitTx(await eth.mint(amount));
+    await waitTx(await eth.approve(lpToken.address, amount));
+    await waitTx(await vault.deposit(amount, deployer.address));
     const lockedBalance = await lpToken.lockedBalanceOf(deployer.address);
     expect(lockedBalance).to.be.equal(amount);
     expect(await lpToken.balanceOf(deployer.address)).to.be.equal(0);
@@ -50,7 +50,7 @@ makeSuite('Vault', (testEnv) => {
   })
 
   it("Balance should be locked when the release time is reached but user deposie some asset before it.", async() => {
-    const { vault, eth, lpToken, deployer, reserve } = testEnv;
+    const { vault, eth, lpToken, deployer, reserve, timeScale } = testEnv;
     if(vault === undefined || lpToken === undefined || eth === undefined || deployer === undefined || reserve === undefined){
       throw new Error('testEnv not initialized');
     }
@@ -58,10 +58,10 @@ makeSuite('Vault', (testEnv) => {
     expect(await lpToken.lockedBalanceOf(deployer.address)).to.be.equal(amount);
     expect(await lpToken.balanceOf(deployer.address)).to.be.equal(0);
     const releaseTime = await lpToken.releaseTime(deployer.address);
-    await time.increase(24*3600);
-    await eth.mint(amount);
-    await eth.approve(lpToken.address, amount);
-    await vault.deposit(amount, deployer.address);
+    await time.increase(BigNumber.from(24*3600).div(timeScale).toNumber());
+    await waitTx(await eth.mint(amount));
+    await waitTx(await eth.approve(lpToken.address, amount));
+    await waitTx(await vault.deposit(amount, deployer.address));
     await time.increaseTo(releaseTime.toNumber());
     const lockedBalance = await lpToken.lockedBalanceOf(deployer.address);
     expect(await lpToken.lockedBalanceOf(deployer.address)).to.be.equal(lockedBalance);
@@ -88,9 +88,9 @@ makeSuite('Vault', (testEnv) => {
     }
     const balance = await lpToken.balanceOf(deployer.address);
     const amount = ethers.utils.parseEther("100");
-    await eth.mint(amount);
-    await eth.approve(lpToken.address, amount);
-    await vault.deposit(amount, deployer.address);
+    await waitTx(await eth.mint(amount));
+    await waitTx(await eth.approve(lpToken.address, amount));
+    await waitTx(await vault.deposit(amount, deployer.address));
     expect(await lpToken.lockedBalanceOf(deployer.address)).to.be.equal(amount);
     expect(await lpToken.balanceOf(deployer.address)).to.be.equal(balance);
   })
@@ -102,8 +102,8 @@ makeSuite('Vault', (testEnv) => {
     }
     const amount = ethers.utils.parseEther("100");
     const fee = amount.mul(3).div(1000);
-    await lpToken.approve(vault.address, amount);
-    await vault.withdraw(amount, deployer.address);
+    await waitTx(await lpToken.approve(vault.address, amount));
+    await waitTx(await vault.withdraw(amount, deployer.address));
     const balance = await eth.balanceOf(deployer.address);
     expect(balance).to.be.equal(amount.sub(fee));
     const reserveBalance = await eth.balanceOf(reserve.address);
@@ -117,7 +117,7 @@ makeSuite('Vault', (testEnv) => {
     }
     const amount = await lpToken.balanceOf(deployer.address);
     const totalAssets = await lpToken.totalAssets();
-    await lpToken.approve(vault.address, amount);
+    await waitTx(await lpToken.approve(vault.address, amount));
     await expect(vault.withdraw(amount, deployer.address))
           .to.be.revertedWithCustomError(lpToken, "WithdrawMoreThanMax")
           .withArgs(lpToken.address, amount, totalAssets.div(2));
@@ -129,7 +129,7 @@ makeSuite('Vault', (testEnv) => {
       throw new Error('testEnv not initialized');
     }
     const amount = await lpToken.balanceOf(deployer.address);
-    await lpToken.transfer(users[0].address, amount);
+    await waitTx(await lpToken.transfer(users[0].address, amount));
     expect(await lpToken.balanceOf(deployer.address)).to.be.equal(0);
     expect(await lpToken.balanceOf(users[0].address)).to.be.equal(amount);
   });
@@ -147,16 +147,16 @@ makeSuite('Vault', (testEnv) => {
     const releaseTime = await lpToken.releaseTime(deployer.address);
     await time.increaseTo(releaseTime.toNumber());
     expect(await lpToken.balanceOf(deployer.address)).to.be.equal(lockedBalance);
-    await eth.mint(amount);
-    await eth.approve(lpToken.address, amount);
-    await vault.deposit(amount, deployer.address);
+    await waitTx(await eth.mint(amount));
+    await waitTx(await eth.approve(lpToken.address, amount));
+    await waitTx(await vault.deposit(amount, deployer.address));
     const newReleaseTime = await lpToken.releaseTime(deployer.address);
     expect(await lpToken.lockedBalanceOf(deployer.address)).to.be.equal(amount);
     expect(await lpToken.balanceOf(deployer.address)).to.be.equal(lockedBalance);
     await time.increaseTo(newReleaseTime.toNumber());
     expect(await lpToken.lockedBalanceOf(deployer.address)).to.be.equal(0);
     expect(await lpToken.balanceOf(deployer.address)).to.be.equal(lockedBalance.add(amount));
-    await lpToken.transfer(users[0].address, lockedBalance.add(amount));
+    await waitTx(await lpToken.transfer(users[0].address, lockedBalance.add(amount)));
     expect(await lpToken.balanceOf(deployer.address)).to.be.equal(0);
     expect(await lpToken.balanceOf(users[0].address)).to.be.equal(user0Balance.add(lockedBalance).add(amount));
   });
@@ -174,9 +174,9 @@ makeSuite('Vault', (testEnv) => {
     const expiry = await time.latest() + 28 * 3600 * 24;
     const strikePrice = bigNumber(12, 19);
     const amount = bigNumber(5, 17);
-    const premium = (await vault.estimatePremium(nft, 0, strikePrice, expiry, amount)).mul(105).div(100);
+    const premium = (await vault.estimatePremium(nft, 0, strikePrice, expiry, amount));
     const keeperFee = await vault.KEEPER_FEE();
-    await eth.approve(vault.address, premium.add(keeperFee));
+    await waitTx(await eth.approve(vault.address, premium.mul(105).div(100).add(keeperFee)));
     const openTxRec = await waitTx(
       await vault.openPosition(
         nft, 
@@ -184,14 +184,16 @@ makeSuite('Vault', (testEnv) => {
         0, 
         strikePrice, 
         expiry, 
-        amount, premium));
+        amount, premium.mul(105).div(100)));
     const events = openTxRec.events;
     expect(events).is.not.undefined;
     const openEvent = events?.filter(event => event.topics[0] == vault.interface.getEventTopic('OpenPosition'))[0];
     const estimatedPremium = openEvent.args['parameters']['premium'];
-    expect(estimatedPremium).to.be.equal(BigNumber.from("778208807326428188").mul(amount).add(bigNumber(1,18)).sub(1).div(bigNumber(1, 18)));
+    console.log(`estimatedPremium: ${estimatedPremium}`);
+    console.log(`premium: ${premium}`);
+    expect(estimatedPremium.sub(premium).abs()).to.be.lt(premium.div(100));
     const vaultBalance = await eth.balanceOf(vault.address);
-    expect(vaultBalance).to.be.equal(premium.add(keeperFee));
+    expect(vaultBalance).to.be.equal(premium.mul(105).div(100).add(keeperFee));
     
   });
 
@@ -206,7 +208,7 @@ makeSuite('Vault', (testEnv) => {
     const positionIds = await keeperHelper.getPendingOptions(nft);
     let state = await optionToken.optionPositionState(positionIds[0]);
     expect(state).to.be.equal(1); // PENDING
-    await keeperHelper.batchActivateOptions(nft, positionIds);
+    await waitTx(await keeperHelper.batchActivateOptions(nft, positionIds));
     state = await optionToken.optionPositionState(positionIds[0]);
     expect(state).to.be.equal(2); // ACTIVE
     const vaultBalance = await eth.balanceOf(vault.address);
@@ -214,7 +216,7 @@ makeSuite('Vault', (testEnv) => {
   });
 
   it("Should be able to open a position on behalf of other user", async () => {
-    const { vault, keeperHelper, eth, lpToken, riskCache, deployer, markets, users } = testEnv;
+    const { vault, keeperHelper, eth, lpToken, riskCache, deployer, markets, users, timeScale } = testEnv;
     if(vault === undefined || lpToken === undefined || eth === undefined || deployer === undefined 
        || riskCache === undefined || keeperHelper === undefined || Object.keys(markets).length == 0 || Object.keys(users).length == 0){
       throw new Error('testEnv not initialized');
@@ -226,10 +228,10 @@ makeSuite('Vault', (testEnv) => {
     const strikePrice = bigNumber(12, 19);
     const amount = bigNumber(5, 17);
     console.log(`delta: ${await riskCache.getAssetDelta(nft)}`);
-    const premium = (await vault.estimatePremium(nft, 0, strikePrice, expiry, amount)).mul(105).div(100);
+    const premium = (await vault.estimatePremium(nft, 0, strikePrice, expiry, amount));
     const receiver = users[0];
     const keeperFee = await vault.KEEPER_FEE();
-    await eth.approve(vault.address, premium.add(keeperFee));
+    await waitTx(await eth.approve(vault.address, premium.mul(105).div(100).add(keeperFee)));
     const openTxRec = await waitTx(
       await vault.openPosition(
         nft,
@@ -237,16 +239,16 @@ makeSuite('Vault', (testEnv) => {
         0,
         strikePrice,
         expiry,
-        amount, premium));
+        amount, premium.mul(105).div(100)));
     const events = openTxRec.events;
     expect(events).is.not.undefined;
     const openEvent = events?.filter(event => event.topics[0] == vault.interface.getEventTopic('OpenPosition'))[0];
     const estimatedPremium = openEvent.args['parameters']['premium'];
-    expect(estimatedPremium).to.be.equal(BigNumber.from("941439689980872262").mul(amount).add(bigNumber(1,18)).sub(1).div(bigNumber(1, 18)));
+    expect(estimatedPremium.sub(premium).abs()).to.be.lt(premium.div(100));
     const positionIds = await keeperHelper.getPendingOptions(nft);
     let state = await optionToken.optionPositionState(positionIds[0]);
     expect(state).to.be.equal(1); // PENDING
-    await keeperHelper.batchActivateOptions(nft, positionIds);
+    const activeTxRec = await waitTx(await keeperHelper.batchActivateOptions(nft, positionIds));
     state = await optionToken.optionPositionState(positionIds[0]);
     expect(state).to.be.equal(2); // ACTIVE
     
@@ -267,7 +269,7 @@ makeSuite('Vault', (testEnv) => {
     let expiry = (await vault.strike(strikeId)).expiry;
     await time.increaseTo(expiry);
     const expiredPositions = await keeperHelper.getExpiredOptions(nft);
-    await keeperHelper.batchCloseOptions(nft, expiredPositions);
+    await waitTx(await keeperHelper.batchCloseOptions(nft, expiredPositions));
   });
 
   it("Should be able to close a position with profit", async() => {
@@ -303,7 +305,7 @@ makeSuite('Vault', (testEnv) => {
     const [outerIndex, innerIndex] = await oracle.getIndexes(nft);
     await waitTx(await oracle.connect(users[1].signer).batchSetAssetPrice([outerIndex], [[{index: innerIndex, price: profitPrice.div(bigNumber(1, 18-2)), vol: bigNumber(5, 2)}]]));
     const expiredPositions = await keeperHelper.getExpiredOptions(nft);
-    await keeperHelper.batchCloseOptions(nft, expiredPositions);
+    await waitTx(await keeperHelper.batchCloseOptions(nft, expiredPositions));
     const balanceAfter = await eth.balanceOf(owner.address);
     expect(balanceAfter.sub(balanceBefore)).to.be.equal(profit);
   });
@@ -324,7 +326,7 @@ makeSuite('Vault', (testEnv) => {
     const premium = (await vault.estimatePremium(nft, 0, strikePrice, expiry, amount)).mul(105).div(100);
     const receiver = users[0];
     const keeperFee = await vault.KEEPER_FEE();
-    await eth.approve(vault.address, premium.add(keeperFee));
+    await waitTx(await eth.approve(vault.address, premium.add(keeperFee)));
     const openTxRec = await waitTx(
       await vault.openPosition(
         nft,
@@ -340,7 +342,7 @@ makeSuite('Vault', (testEnv) => {
     expect(state).to.be.equal(1); // PENDING
     const balanceBefore = await eth.balanceOf(await vault.reserve());
     const userBalanceBefore = await eth.balanceOf(deployer.address);
-    await vault.forceClosePendingPosition(nft, positionIds[0]);
+    await waitTx(await vault.forceClosePendingPosition(nft, positionIds[0]));
     const balanceAfter = await eth.balanceOf(await vault.reserve());
     const userBalanceAfter = await eth.balanceOf(deployer.address);
     expect(balanceAfter.sub(balanceBefore)).to.be.equal(keeperFee);

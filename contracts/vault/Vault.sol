@@ -60,6 +60,7 @@ contract Vault is IVault, Pausable, Ownable{
     uint256 public override constant MAXIMUM_PUT_STRIKE_PRICE_RATIO = GENERAL_UNIT * 90 / 100; // 90%
     uint256 public override constant MINIMUM_PUT_STRIKE_PRICE_RATIO = GENERAL_UNIT * 50 / 100; // 50%
     uint256 public override constant KEEPER_FEE = 5 * 10**13; // 0.00005 ETH
+    uint256 public override constant TIME_SCALE = 1;
 
     uint256 public override constant MINIMUM_DURATION = 3 days;
     uint256 public override constant MAXIMUM_DURATION = 30 days;
