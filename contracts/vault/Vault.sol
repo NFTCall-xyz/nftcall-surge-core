@@ -328,6 +328,19 @@ contract Vault is IVault, Pausable, Ownable{
         return premium;
     }
 
+    function adjustedVolatility(address collection, OptionType optionType, uint256 strikePrice, uint256 amount) public view override returns(uint256 adjustedVol){
+        IPricer pricer = IPricer(_pricer);
+        uint256 lockedValue;
+        uint256 entryPrice = IOracle(_oracle).getAssetPrice(collection);
+        if(optionType == OptionType.LONG_CALL){
+            lockedValue = entryPrice.mulDiv(amount, UNIT, Math.Rounding.Up);
+        }
+        else {
+            lockedValue = strikePrice.mulDiv(amount, UNIT, Math.Rounding.Up);
+        }
+        return pricer.getAdjustedVol(collection, optionType, strikePrice, lockedValue);
+    }
+
     //for options
     function openPosition(address collection, address onBehalfOf, OptionType optionType, uint256 strikePrice, uint256 expiry, uint256 amount, uint256 maximumPremium) 
         public override onlyUnpaused

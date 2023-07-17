@@ -77,6 +77,7 @@ interface IVault {
     function totalAssets() external view returns(uint256);
     function totalLockedAssets() external view returns(uint256);
     function estimatePremium(address collection, OptionType optionType, uint256 strikePrice, uint256 expiry, uint256 amount) external view returns(uint256 premium);
+    function adjustedVolatility(address collection, OptionType optionType, uint256 strikePrice, uint256 amount) external view returns(uint256);
     function openPosition(address collection, address onBehalfOf, OptionType optionType, uint256 strikePrice, uint256 expiry, uint256 amount, uint256 maximumPremium) external returns(uint256 positionId, uint256 premium);
     function activePosition(address collection, uint256 positionId) external returns(uint256 premium, int256 delta);
     function positionPNLWeightedDelta(address collection, uint256 positionId) external view returns(int256 unrealizePNL, int256 weightedDelta);
