@@ -124,6 +124,10 @@ contract LPToken is ILPToken, ERC4626, Ownable, SimpleInitializable {
         return Math.min(userBalance, _maxWithdrawBalance());
     }
 
+    function maxRedeem(address user) public view override returns (uint256) {
+        return _maxRedeem(user);
+    }
+
     function _maxRedeem(address user) internal view returns (uint256) {
         uint256 userBalance = balanceOf(user);
         if(userBalance == 0) {
@@ -178,18 +182,24 @@ contract LPToken is ILPToken, ERC4626, Ownable, SimpleInitializable {
     }
 
     function withdraw(uint256 assets, address receiver, address owner) public override returns(uint256){
-        uint256 maximumWithdrawShares = maxWithdraw(owner);
-        uint256 shares = previewWithdraw(assets);
-        if(shares > maximumWithdrawShares){
-            revert WithdrawMoreThanMax(address(this), shares, maximumWithdrawShares);
+        uint256 maximumWithdrawAssets = _maxWithdraw(owner);
+        if(assets == type(uint256).max){
+            assets = maximumWithdrawAssets;
         }
+        else if(assets > maximumWithdrawAssets){
+            revert WithdrawMoreThanMax(address(this), assets, maximumWithdrawAssets);
+        }    
+        uint256 shares = previewWithdraw(assets);
         _withdraw(_msgSender(), receiver, owner, assets, shares);
         return assets;
     }
 
     function redeem(uint256 shares, address receiver, address owner) public override returns(uint256) {
         uint256 maximumRedeemShares = _maxRedeem(owner);
-        if(shares > maximumRedeemShares){
+        if(shares == type(uint256).max){
+            shares = maximumRedeemShares;
+        }
+        else if(shares > maximumRedeemShares){
             revert RedeemMoreThanMax(address(this), shares, maximumRedeemShares);
         }
         uint256 assets = previewRedeem(shares);

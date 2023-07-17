@@ -195,6 +195,10 @@ contract Vault is IVault, Pausable, Ownable{
         return LPToken(_lpToken).withdraw(amount, to, msg.sender);
     }
 
+    function redeem(uint256 amount, address to) public override onlyUnpaused returns(uint256){
+        return LPToken(_lpToken).redeem(amount, to, msg.sender);
+    }
+
     function totalAssets() public view override returns(uint256) {
         return LPToken(_lpToken).totalAssets();
     }

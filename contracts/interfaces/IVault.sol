@@ -72,6 +72,7 @@ interface IVault {
     function unrealizedPremium() external view returns(uint256);
     function deposit(uint256 amount, address onBehalfOf) external;
     function withdraw(uint256 amount, address to) external returns(uint256);
+    function redeem(uint256 amount, address to) external returns(uint256);
     function totalAssets() external view returns(uint256);
     function totalLockedAssets() external view returns(uint256);
     function estimatePremium(address collection, OptionType optionType, uint256 strikePrice, uint256 expiry, uint256 amount) external view returns(uint256 premium);
