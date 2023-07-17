@@ -395,6 +395,7 @@ contract Vault is IVault, Pausable, Ownable{
             _strikes[position.strikeId] = strike_;
             address payer = position.payer;
             uint256 excessPremium = position.maximumPremium - premium;
+            LPToken(_lpToken).increaseTotalAssets(premium - amountToReserve);
             emit ActivatePosition(optionToken.ownerOf(positionId), collection, positionId, premium, excessPremium, delta);
             IERC20(_asset).safeTransfer(_reserve, amountToReserve + KEEPER_FEE);
             IERC20(_asset).safeTransfer(_lpToken, premium - amountToReserve);
@@ -450,6 +451,7 @@ contract Vault is IVault, Pausable, Ownable{
         (profit, fee) = _calculateExerciseProfit(position.optionType, settlementPrice, strike_.entryPrice, strike_.strikePrice, position.amount);
         if(profit != 0){
             _realizedPNL -= int256(profit + fee);
+            LPToken(_lpToken).decreaseTotalAssets(profit + fee);
             emit ExercisePosition(to, collection, positionId, profit, fee, settlementPrice);
             IERC20(_asset).safeTransferFrom(_lpToken, _backstopPool, fee);
             IERC20(_asset).safeTransferFrom(_lpToken, to, profit);

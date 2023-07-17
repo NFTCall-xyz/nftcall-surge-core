@@ -22,6 +22,7 @@ contract LPToken is ILPToken, ERC4626, Ownable, SimpleInitializable {
     uint256 private _maximumVaultBalance = 0;
     uint256 private _minimumAssetToShareRatio = GENERAL_UNIT * 10 / 100; // 10%
     uint256 private _totalLockedBalance = 0;
+    uint256 private _totalAssets = 0;
     uint256 public constant MAXIMUM_WITHDRAW_RATIO = GENERAL_UNIT * 50 / 100; // 50%
     uint256 public constant WITHDRAW_FEE_RATIO = GENERAL_UNIT * 3 / 1000; // 0.3%
     uint256 public constant LOCK_PERIOD = 3 days;
@@ -89,8 +90,21 @@ contract LPToken is ILPToken, ERC4626, Ownable, SimpleInitializable {
 
     function totalAssets() public view override returns (uint256) {
         IVault vaultContract = IVault(_vault);
-        int256 assets = int256(super.totalAssets() - vaultContract.unrealizedPremium()) + vaultContract.unrealizedPNL();
+        int256 assets = int256(_totalAssets - vaultContract.unrealizedPremium()) + vaultContract.unrealizedPNL();
         return assets > 0 ? uint256(assets) : 0;
+    }
+
+    function increaseTotalAssets(uint256 amount) public override onlyVault {
+        _updateTotalAssets(totalAssets() + amount);
+    }
+
+    function decreaseTotalAssets(uint256 amount) public override onlyVault {
+        _updateTotalAssets(totalAssets() - amount);
+    }
+
+    function _updateTotalAssets(uint256 assets) internal {
+        _totalAssets = assets;
+        emit UpdateTotalAssets(assets);
     }
 
     function totalSupply() public view override(ERC20, IERC20) returns (uint256) {
@@ -207,6 +221,20 @@ contract LPToken is ILPToken, ERC4626, Ownable, SimpleInitializable {
         return shares;
     }
 
+    function untitledAssets() public view override returns(uint256) {
+        return IERC20(asset()).balanceOf(address(this)) - totalAssets();
+    }
+
+    function collect(address receiver) public override returns(uint256) {
+        uint256 amount = untitledAssets();
+        if(amount == 0){
+            revert NoAssetsToCollect(address(this));
+        }
+        IERC20(asset()).safeTransfer(receiver, amount);
+        emit Collect(receiver, amount);
+        return amount;
+    }
+
     /**
      * @dev Deposit/mint common workflow.
      */
@@ -225,6 +253,7 @@ contract LPToken is ILPToken, ERC4626, Ownable, SimpleInitializable {
         // slither-disable-next-line reentrancy-no-eth
         SafeERC20.safeTransferFrom(IERC20(asset()), caller, address(this), assets);
         _claim(receiver);
+        _totalAssets += assets;
         _lockedBalances[receiver].lockedBalance += shares;
         _totalLockedBalance +=  shares;
         _lockedBalances[receiver].releaseTime = block.timestamp + LOCK_PERIOD;
@@ -256,6 +285,7 @@ contract LPToken is ILPToken, ERC4626, Ownable, SimpleInitializable {
         address reserve = IVault(_vault).reserve();
         erc20Asset.safeTransfer(reserve, fee);
         uint256 feeShares = _convertToShares(fee, Math.Rounding.Up);
+        _totalAssets -= assets;
         erc20Asset.safeTransfer(receiver, (assets - fee));
         emit Withdraw(caller, reserve, owner, fee, feeShares);
         emit Withdraw(caller, receiver, owner, assets - fee, shares - feeShares);
