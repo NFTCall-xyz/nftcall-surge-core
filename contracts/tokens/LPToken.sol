@@ -95,11 +95,11 @@ contract LPToken is ILPToken, ERC4626, Ownable, SimpleInitializable {
     }
 
     function increaseTotalAssets(uint256 amount) public override onlyVault {
-        _updateTotalAssets(totalAssets() + amount);
+        _updateTotalAssets(_totalAssets + amount);
     }
 
     function decreaseTotalAssets(uint256 amount) public override onlyVault {
-        _updateTotalAssets(totalAssets() - amount);
+        _updateTotalAssets(_totalAssets - amount);
     }
 
     function _updateTotalAssets(uint256 assets) internal {

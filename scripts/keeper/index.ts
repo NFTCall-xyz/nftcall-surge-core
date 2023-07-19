@@ -162,6 +162,7 @@ export const resetRisk = async (market: string) => {
 }
 
 export const processMarket = async (market: string) => {
+    console.log(`Processing market: ${market}`);
     const closedPositions = await cloesOptions(market);
     const needToUpdatePNL = await updateRisk(market, closedPositions > 0);
     await activateOptions(market);
