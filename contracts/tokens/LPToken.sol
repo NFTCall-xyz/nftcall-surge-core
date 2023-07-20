@@ -121,7 +121,6 @@ contract LPToken is ILPToken, ERC4626, Ownable, SimpleInitializable {
     }
 
     function _maxDeposit() internal view returns (uint256) {
-        uint256 _totalAssets = totalAssets();
         return (_totalAssets < _maximumVaultBalance) ? (_maximumVaultBalance - _totalAssets) : 0;
     }
 
@@ -151,7 +150,6 @@ contract LPToken is ILPToken, ERC4626, Ownable, SimpleInitializable {
     }
 
     function _maxWithdrawBalance() internal view returns (uint256) {
-        uint256 _totalAssets = totalAssets();
         uint256 _totalLockedAssets = IVault(_vault).totalLockedAssets();
         return (_totalAssets > _totalLockedAssets) ? (_totalAssets - _totalLockedAssets).mulDiv(MAXIMUM_WITHDRAW_RATIO, GENERAL_UNIT, Math.Rounding.Down) : 0;
     }
