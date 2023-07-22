@@ -374,7 +374,7 @@ contract Vault is IVault, Pausable, Ownable{
         return (positionId, premium);
     }
 
-    function activePosition(address collection, uint256 positionId) public override onlyKeeper onlyUnpaused returns(uint256 premium, int256 delta){
+    function activatePosition(address collection, uint256 positionId) public override onlyKeeper onlyUnpaused returns(uint256 premium, int256 delta){
         if(_collections[collection].frozen){
             revert FrozenMarket(address(this), collection);
         }
