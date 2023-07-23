@@ -53,7 +53,7 @@ const config: HardhatUserConfig = {
   },
   etherscan: {
     apiKey: {
-      arbitrumGoerli: process.env.ETHERSCAN_KEY || '',
+      arbitrumGoerli: process.env.ARB_SCAN_KEY || '',
     }
   },
 };
