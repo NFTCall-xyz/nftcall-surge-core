@@ -64,15 +64,15 @@ contract OptionToken is IOptionToken, ERC721Enumerable, Ownable, SimpleInitializ
         emit UpdateBaseURI(baseURI);
     }
 
-    function openPosition(address to, OptionType optionType, uint256 strikeId, uint256 amount) public override onlyVault returns(uint256)
+    function openPosition(address payer, address to, OptionType optionType, uint256 strikeId, uint256 amount, uint256 maximumPremium) public override onlyVault returns(uint256)
     {
         if(amount == 0) {
             revert ZeroAmount(address(this));
         }
         uint256 positionId = _nextId++;
-        _options[positionId] = OptionPosition(strikeId, PositionState.PENDING, optionType, amount, 0);
+        _options[positionId] = OptionPosition(PositionState.PENDING, optionType, payer, strikeId, amount, 0, maximumPremium);
         _totalValue += lockedValue(positionId);
-        emit OpenPosition(to, positionId, optionType, strikeId, amount);
+        emit OpenPosition(payer, to, positionId, optionType, strikeId, amount, maximumPremium);
         _safeMint(to, positionId);
         return positionId;
     }

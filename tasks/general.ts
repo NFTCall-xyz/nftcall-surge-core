@@ -5,6 +5,7 @@ import {
     deployPricer,
     deployRiskCache,
     deployReserve,
+    deployBackstopPool,
     deployKeeperHelper,
     initializeLPToken,
     getAddress,
@@ -61,6 +62,13 @@ task('reserve:deploy', 'Deploy Reserve')
         const reserve = await deployReserve(verify);
     });
 
+task('backstopPool:deploy', 'Deploy Backstop Pool')
+    .addFlag('verify', 'Verify contract at Etherscan')
+    .setAction(async ({ verify }, hre) => {
+        await hre.run('set-DRE');
+        const backstopPool = await deployBackstopPool(verify);
+    });
+
 task('lpToken:init', 'Initialize LP Token')
     .addParam('maximumSupply', 'Maximum supply of LP tokens')
     .setAction(async ({ maximumSupply }, hre) => {
@@ -73,13 +81,15 @@ task('lpToken:init', 'Initialize LP Token')
 task('pricer:init', 'Initialize Pricer')
     .setAction(async ({ }, hre) => {
         await hre.run('set-DRE');
+        const vault = await getVault();
+        if(!vault) throw new Error(`Vault not found`);
         const pricer = await getPricer();
         if(!pricer) throw new Error(`Pricer not found`);
         const riskCache = await getRiskCache();
         if(!riskCache) throw new Error(`Risk Cache not found`);
         const oracle = await getOracle();
         if(!oracle) throw new Error(`Oracle not found`);
-        await waitTx(await pricer.initialize(riskCache.address, oracle.address));
+        await waitTx(await pricer.initialize(vault.address, riskCache.address, oracle.address));
     });
 
 task('keeperHelper:deploy', 'Deploy KeeperHelper')

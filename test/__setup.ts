@@ -14,7 +14,8 @@ import {
     deployKeeperHelper,
     initializeLPToken,
     initializeOptionToken,
-    initializeMarket
+    initializeMarket,
+    deployBackstopPool
 } from '../scripts/utils/contracts';
 import {
     initializeMakeSuite,
@@ -36,14 +37,15 @@ async function buildTestEnv() {
     const pricer = await deployPricer();
     const riskCache = await deployRiskCache();
     const reserve = await deployReserve();
-    const vault = await deployVault(erc20.address, lpToken.address, oracle.address, pricer.address, riskCache.address, reserve.address);
+    const backstopPool = await deployBackstopPool();
+    const vault = await deployVault(erc20.address, lpToken.address, oracle.address, pricer.address, riskCache.address, reserve.address, backstopPool.address);
     await initializeLPToken(bigNumber(1000000, 18));
     const optionToken = await deployOptionToken(nft.address, "NFTCall BAYC Options Token", "ncBAYC", "https://bayc.finance/", "BAYC");
     await oracle.addAssets([nft.address]);
     await oracle.setOperator(operator.address);
     const [outerIndex, innerIndex] = await oracle.getIndexes(nft.address);
     await oracle.connect(operator).batchSetAssetPrice([outerIndex], [[{index: innerIndex, price: bigNumber(100, 2), vol: bigNumber(5, 2)}]]);
-    await pricer.initialize(riskCache.address, oracle.address);
+    await pricer.initialize(vault.address, riskCache.address, oracle.address);
     await initializeOptionToken('BAYC');
     await initializeMarket('BAYC', bigNumber(50, 6-2));
     const keeperHelper = await deployKeeperHelper(vault.address);

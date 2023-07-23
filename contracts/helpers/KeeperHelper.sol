@@ -42,7 +42,7 @@ contract KeeperHelper is Ownable{
         for(uint256 i = 0; i < optionToken.totalSupply(); ++i){
             uint256 tokenId = optionToken.tokenByIndex(i);
             OptionPosition memory position = optionToken.optionPosition(tokenId);
-            if(position.state == PositionState.ACTIVE && IVault(_vault).strike(position.strikeId).expiry <= block.timestamp){
+            if(position.state == PositionState.ACTIVE && IVault(_vault).strike(position.strikeId).expiry <= currentTime){
                 ++totalExpiredTokens;
             }
         }
@@ -53,6 +53,32 @@ contract KeeperHelper is Ownable{
             uint256 tokenId = optionToken.tokenByIndex(index);
             OptionPosition memory position = optionToken.optionPosition(tokenId);
             if(position.state == PositionState.ACTIVE && IVault(_vault).strike(position.strikeId).expiry <= currentTime){
+                tokenIds[resultIndex] = tokenId;
+                ++resultIndex;
+            }
+            ++index;
+        }
+        return tokenIds;
+    }
+
+    function getActiveOptions(address collection) external view returns (uint256[] memory tokenIds) {
+        OptionToken optionToken = OptionToken(IVault(_vault).marketConfiguration(collection).optionToken);
+        uint256 totalActiveTokens = 0;
+        uint256 currentTime = block.timestamp;
+        for(uint256 i = 0; i < optionToken.totalSupply(); ++i){
+            uint256 tokenId = optionToken.tokenByIndex(i);
+            OptionPosition memory position = optionToken.optionPosition(tokenId);
+            if(position.state == PositionState.ACTIVE && IVault(_vault).strike(position.strikeId).expiry > currentTime){
+                ++totalActiveTokens;
+            }
+        }
+        tokenIds = new uint256[](totalActiveTokens);
+        uint256 index = 0;
+        uint256 resultIndex = 0;
+        while(index < totalActiveTokens){
+            uint256 tokenId = optionToken.tokenByIndex(index);
+            OptionPosition memory position = optionToken.optionPosition(tokenId);
+            if(position.state == PositionState.ACTIVE && IVault(_vault).strike(position.strikeId).expiry > currentTime){
                 tokenIds[resultIndex] = tokenId;
                 ++resultIndex;
             }

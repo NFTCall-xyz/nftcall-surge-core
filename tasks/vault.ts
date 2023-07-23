@@ -6,6 +6,7 @@ import {
     getPricer,
     getRiskCache,
     getReserve,
+    getBackstopPool,
     getVault,
     deployVault,
     initializeMarket,
@@ -31,7 +32,17 @@ task('vault:deploy', 'Deploy Vault')
         if(!riskCache) throw new Error(`Risk Cache not found`);
         const reserve = await getReserve();
         if(!reserve) throw new Error(`Reserve not found`);
-        const vault = await deployVault(underlyingAddress, lpToken.address, oracle.address, pricer.address, riskCache.address, reserve.address, verify);
+        const backstopPool = await getBackstopPool();
+        if(!backstopPool) throw new Error(`BackstopPool not found`);
+        const vault = await deployVault(
+            underlyingAddress, 
+            lpToken.address, 
+            oracle.address, 
+            pricer.address, 
+            riskCache.address, 
+            reserve.address, 
+            backstopPool.address, 
+            verify);
     });
 
 task('vault:initMarket', 'Initialize market')

@@ -6,23 +6,22 @@ import {SignedDecimalMath} from "./synthetix/SignedDecimalMath.sol";
 import {DecimalMath} from "./synthetix/DecimalMath.sol";
 import {BlackScholes} from "./libraries/BlackScholes.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 // Inherited
-import "./libraries/SimpleInitializable.sol";
-import "./libraries/Math.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {SimpleInitializable} from "./libraries/SimpleInitializable.sol";
+import {IPricer} from "./interfaces/IPricer.sol";
 
 // Interfaces
-import "./AssetRiskCache.sol";
-import "./NFTCallOracle.sol";
-import "./interfaces/IOracle.sol";
-import "./interfaces/IAssetRiskCache.sol";
+import {IVault} from "./interfaces/IVault.sol";
+import {IOracle} from "./interfaces/IOracle.sol";
+import {IAssetRiskCache} from "./interfaces/IAssetRiskCache.sol";
+
+import {Vault} from "./vault/Vault.sol";
+import {AssetRiskCache} from "./AssetRiskCache.sol";
+import {NFTCallOracle} from "./NFTCallOracle.sol";
 import {OptionType} from "./interfaces/IOptionToken.sol";
-import {GENERAL_DECIMALS, GENERAL_UNIT } from "./libraries/DataTypes.sol";
-import { PERCENTAGE_FACTOR } from "./libraries/math/PercentageMath.sol";
-
-
-import "./interfaces/IPricer.sol";
+import {GENERAL_DECIMALS, GENERAL_UNIT, UNIT } from "./libraries/DataTypes.sol";
 
 import "hardhat/console.sol";
 
@@ -38,6 +37,8 @@ contract OptionPricer is IPricer, Ownable, SimpleInitializable {
   using SignedDecimalMath for int;
   using BlackScholes for BlackScholes.BlackScholesInputs;
 
+  uint256 private constant HALF_PERCENT = GENERAL_UNIT / 2;
+
   /**
    * skewP1 & skewP2 are used for skew adjustment. i.e., skewP1 = 1000, which is 0.1; skewP2 = 2000, which is actually 0.2
    * deltaP1 & deltaP2 are used for delta adjustment. i.e., deltaP1 = 5000(0.5), deltaP2 = 2000(0.2)
@@ -49,13 +50,15 @@ contract OptionPricer is IPricer, Ownable, SimpleInitializable {
     uint deltaP2;
   }
 
+  Vault internal vault;
   AssetRiskCache internal risk;
   NFTCallOracle internal oracle;
   PricerParams private pricerParams;
   // riskFreeRate is ETH POS interest rate, now annually 4.8%.
-  int private riskFreeRate = int(PERCENTAGE_FACTOR * 48 / 1000);
+  int private riskFreeRate = int(GENERAL_UNIT * 48 / 1000);
 
-  function initialize(address riskCache_, address oracle_) public onlyOwner initializer {
+  function initialize(address vault_, address riskCache_, address oracle_) public onlyOwner initializer {
+    vault = Vault(vault_);
     risk = AssetRiskCache(riskCache_);
     oracle = NFTCallOracle(oracle_);
     pricerParams.skewP1 = GENERAL_UNIT * 10 / 100; // 0.1
@@ -74,16 +77,24 @@ contract OptionPricer is IPricer, Ownable, SimpleInitializable {
     // Impact of skew, delta, and unrealized PNL
     int adjustedVol = int(vol);
     if (ot == OptionType.LONG_CALL) {
-      require(K > S, "Illegal strike price for CALL");
+      if (K <= S) {
+        revert IllegalStrikePrice(msg.sender, S, K);
+      }
       adjustedVol += int(vol*(K-S)*pricerParams.skewP1/S/(GENERAL_UNIT) + vol*(K-S)*(K-S)*pricerParams.skewP2/S/S/(GENERAL_UNIT));
-      adjustedVol -= adjustedVol * delta * int(delta <= 0 ? pricerParams.deltaP1 : pricerParams.deltaP2) / int(GENERAL_UNIT**2);
+      adjustedVol -= adjustedVol * delta * int(delta <= 0 ? pricerParams.deltaP1 : pricerParams.deltaP2) / int(GENERAL_UNIT) / int(UNIT);
     } else {
-      require(K < S, "Illegal strike price for PUT");
+      if (K >= S) {
+        revert IllegalStrikePrice(msg.sender, S, K);
+      }
       uint rK = S * S / K;
       adjustedVol += int(vol*(rK-S)*pricerParams.skewP1/S/(GENERAL_UNIT) + vol*(rK-S)*(rK-S)*pricerParams.skewP2/S/S/(GENERAL_UNIT));
-      adjustedVol += adjustedVol * delta * int(delta >= 0 ? pricerParams.deltaP1 : pricerParams.deltaP2) / int(GENERAL_UNIT**2);
+      adjustedVol += adjustedVol * delta * int(delta >= 0 ? pricerParams.deltaP1 : pricerParams.deltaP2) / int(GENERAL_UNIT) / int(UNIT);
     }
-    // Collateral and amount impact
+    // Impact of collateralization ratio
+    uint cr = IVault(vault).totalLockedAssets() * GENERAL_UNIT / IVault(vault).totalAssets();
+    if (cr > HALF_PERCENT) {
+      adjustedVol += adjustedVol * int(cr - HALF_PERCENT) / int(GENERAL_UNIT);
+    }
     return uint(adjustedVol);
   }
 
