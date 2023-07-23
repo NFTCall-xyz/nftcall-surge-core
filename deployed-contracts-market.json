@@ -4,11 +4,10 @@
       "BAYC": "0x610178dA211FEF7D417bC0e6FeD39F05609AD788"
     },
     "localhost": {
-      "false": "0x3106F7feae9Bf4e1A5bE643B5d923BcA35e9947b",
       "BAYC": "0xec7B24E2a2b4ae7dEc39E946BA95A279668a245c",
       "MAYC": "0x8917C976193B0bEb55B688Ac098B28AfC96dBE2b"
     },
-    "arbitrum_goerli": {
+    "arbitrumGoerli": {
       "BAYC": "0x599f27D5dB2C3E6470b27F3671dF8DceeD67d546",
       "MAYC": "0x107175288bFDedAae5d08cDC95CbAEb78D19E117"
     }
