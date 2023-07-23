@@ -49,7 +49,7 @@ contract KeeperHelper is Ownable{
         tokenIds = new uint256[](totalExpiredTokens);
         uint256 index = 0;
         uint256 resultIndex = 0;
-        while(index < totalExpiredTokens){
+        while(resultIndex < totalExpiredTokens){
             uint256 tokenId = optionToken.tokenByIndex(index);
             OptionPosition memory position = optionToken.optionPosition(tokenId);
             if(position.state == PositionState.ACTIVE && IVault(_vault).strike(position.strikeId).expiry <= currentTime){
@@ -75,7 +75,7 @@ contract KeeperHelper is Ownable{
         tokenIds = new uint256[](totalActiveTokens);
         uint256 index = 0;
         uint256 resultIndex = 0;
-        while(index < totalActiveTokens){
+        while(resultIndex < totalActiveTokens){
             uint256 tokenId = optionToken.tokenByIndex(index);
             OptionPosition memory position = optionToken.optionPosition(tokenId);
             if(position.state == PositionState.ACTIVE && IVault(_vault).strike(position.strikeId).expiry > currentTime){
