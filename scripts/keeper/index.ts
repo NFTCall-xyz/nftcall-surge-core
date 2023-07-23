@@ -65,7 +65,7 @@ export const updateRisk = async (market: string) => {
     let newPNL = BigNumber.from(0);
     let newDelta = BigNumber.from(0);
     const positionIds = await keeperHelper.getActiveOptions(nft);
-    console.log('👉 updated delta and PNL of positionIds:', positionIds);
+    console.log('👉 updating delta and PNL of positionIds:', positionIds);
     if(positionIds.length > 0) {
         const optionToken = await getOptionToken(market);
         if(optionToken === undefined) {
@@ -73,10 +73,10 @@ export const updateRisk = async (market: string) => {
         }
         const risk = await keeperHelper.sumPNLWeightedDelta(nft, positionIds);
         newPNL = risk.PNL;
-        newDelta = risk.weightedDelta.mul(bigNumber(1, 18)).div(await optionToken.totalAmount());
+        newDelta = risk.weightedDelta.mul(bigNumber(1, 18)).div(await optionToken['totalAmount()']());
     }
     if((!oldPNL.eq(newPNL)) || (!oldDelta.eq(newDelta))) {
-        await waitTx(await keeperHelper.updateCollectionRisk(nft, newPNL, newDelta));
+        await waitTx(await keeperHelper.updateCollectionRisk(nft, newDelta, newPNL));
         console.log('Updated delta and PNL');
         return true;
     }
@@ -84,6 +84,22 @@ export const updateRisk = async (market: string) => {
         console.log('No need to update delta and PNL');
         return false;
     }
+}
+
+export const resetRisk = async (market: string) => {
+    const keeperHelper = await getKeeperHelper();
+    const nft = await getAddress(market);
+    if(keeperHelper === undefined) {
+        throw Error('KeeperHelper is not deployed');
+    }
+    const riskCache = await getRiskCache();
+    if(riskCache === undefined) {
+        throw Error('RiskCache is not deployed');
+    }
+    let newPNL = BigNumber.from(0);
+    let newDelta = BigNumber.from(0);
+    await waitTx(await keeperHelper.updateCollectionRisk(nft, newPNL, newDelta));
+    console.log(`Reset delta and PNL of ${market}`);
 }
 
 export const processMarket = async (market: string) => {

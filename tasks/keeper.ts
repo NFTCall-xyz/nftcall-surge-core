@@ -16,7 +16,7 @@ import {
 } from '../scripts/utils';
 
 import { BigNumber } from 'ethers';
-import { processAllMarkets } from '../scripts/keeper';
+import { processAllMarkets, resetRisk } from '../scripts/keeper';
 
 task('keeper:fullUpdate', 'Full update')
     .setAction(async ({ }, hre) => {
@@ -24,8 +24,9 @@ task('keeper:fullUpdate', 'Full update')
         await processAllMarkets();
     });
 
-task('keeper:test', 'test')
-    .setAction(async({}, hre) => {
+task('keeper:resetRisk', 'Reset the risk of a market')
+    .addParam('market', 'The market to reset')
+    .setAction(async({market}, hre) => {
         await hre.run('set-DRE');
-        const markets = await getMarkets();
+        await resetRisk(market);
     })

@@ -7,7 +7,7 @@ import {TradeType} from "./IVault.sol";
 struct TradeParameters {
   OptionType optionType;
   TradeType tradeType;
-  uint256 spotPrice;
+  uint256 entryPrice;
   uint256 strikePrice;
   uint256 duration;
   uint256 expiry;
