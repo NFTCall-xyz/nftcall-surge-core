@@ -100,5 +100,6 @@ interface IVault {
     error OnlyUnpaused(address thrower, address caller);
     error FrozenMarket(address thrower, address collection);
     error DeactivatedMarket(address thrower, address collection);
+    error OnlyKeeperOrOwnerOrPayer(address thrower, address caller, address keeper, address owner, address payer);
 }
 
