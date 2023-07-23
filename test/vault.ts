@@ -188,7 +188,7 @@ makeSuite('Vault', (testEnv) => {
     const events = openTxRec.events;
     expect(events).is.not.undefined;
     const openEvent = events?.filter(event => event.topics[0] == vault.interface.getEventTopic('OpenPosition'))[0];
-    const estimatedPremium = openEvent.args['estimatedPremium'];
+    const estimatedPremium = openEvent.args['parameters']['premium'];
     expect(estimatedPremium).to.be.equal(BigNumber.from("778208870944333238").mul(amount).add(bigNumber(1,18)).sub(1).div(bigNumber(1, 18)));
     const vaultBalance = await eth.balanceOf(vault.address);
     expect(vaultBalance).to.be.equal(premium.add(keeperFee));
@@ -239,7 +239,7 @@ makeSuite('Vault', (testEnv) => {
     const events = openTxRec.events;
     expect(events).is.not.undefined;
     const openEvent = events?.filter(event => event.topics[0] == vault.interface.getEventTopic('OpenPosition'))[0];
-    const estimatedPremium = openEvent.args['estimatedPremium'];
+    const estimatedPremium = openEvent.args['parameters']['premium'];
     expect(estimatedPremium).to.be.equal(BigNumber.from("778208870944333238").mul(amount).add(bigNumber(1,18)).sub(1).div(bigNumber(1, 18)));
     const positionIds = await keeperHelper.getPendingOptions(nft);
     let state = await optionToken.optionPositionState(positionIds[0]);
@@ -312,5 +312,45 @@ makeSuite('Vault', (testEnv) => {
     await keeperHelper.batchCloseOptions(nft, expiredPositions);
     const balanceAfter = await eth.balanceOf(owner.address);
     expect(balanceAfter.sub(balanceBefore)).to.be.equal(profit);
+  });
+
+  it("Should be able to cancel a pending position", async() => {
+    const {vault, keeperHelper, eth, deployer, markets, users, oracle} = testEnv;
+    if(vault === undefined || keeperHelper === undefined || deployer === undefined 
+      || oracle == undefined || eth == undefined
+      || Object.keys(markets).length == 0 || Object.keys(users).length == 0) {
+      throw new Error('testEnv not initialized');
+    }
+    const market = markets['BAYC'];
+    const nft = market.nft;
+    const optionToken = market.optionToken;
+    const expiry = await time.latest() + 28 * 3600 * 24;
+    const strikePrice = bigNumber(15, 19);
+    const amount = bigNumber(5, 17);
+    const premium = (await vault.estimatePremium(nft, 0, strikePrice, expiry, amount)).mul(105).div(100);
+    const receiver = users[0];
+    const keeperFee = await vault.KEEPER_FEE();
+    await eth.approve(vault.address, premium.add(keeperFee));
+    const openTxRec = await waitTx(
+      await vault.openPosition(
+        nft,
+        receiver.address,
+        0,
+        strikePrice,
+        expiry,
+        amount, premium));
+    const events = openTxRec.events;
+    expect(events).is.not.undefined;
+    const positionIds = await keeperHelper.getPendingOptions(nft);
+    let state = await optionToken.optionPositionState(positionIds[0]);
+    expect(state).to.be.equal(1); // PENDING
+    const balanceBefore = await eth.balanceOf(await vault.reserve());
+    const userBalanceBefore = await eth.balanceOf(deployer.address);
+    await vault.forceClosePendingPosition(nft, positionIds[0]);
+    const balanceAfter = await eth.balanceOf(await vault.reserve());
+    const userBalanceAfter = await eth.balanceOf(deployer.address);
+    expect(balanceAfter.sub(balanceBefore)).to.be.equal(keeperFee);
+    expect(userBalanceAfter.sub(userBalanceBefore)).to.be.equal(premium);
+
   });
 });

@@ -16,18 +16,20 @@ export const activateOptions = async (market: string) => {
     }
     const positionIds = await keeperHelper.getPendingOptions(nft);
     console.log('👉 activating positionIds:', positionIds);
-    try {
-        await keeperHelper.batchActivateOptions(nft, positionIds);
-    } catch (error) {
-        let failedPositions = [];
-        for(const positionId of positionIds) {
-            try {
-                await vault.activePosition(nft, positionId);
-            }
-            catch (error) {
-                failedPositions.push(positionId);
-                console.log('👉 failed to activate positionId:', positionId);
-                console.log(error);
+    if(positionIds.length > 0) {
+        try {
+            await keeperHelper.batchActivateOptions(nft, positionIds);
+        } catch (error) {
+            let failedPositions = [];
+            for(const positionId of positionIds) {
+                try {
+                    await vault.activePosition(nft, positionId);
+                }
+                catch (error) {
+                    failedPositions.push(positionId);
+                    console.log('👉 failed to activate positionId:', positionId);
+                    console.log(error);
+                }
             }
         }
     }
@@ -42,7 +44,9 @@ export const cloesOptions = async (market: string) => {
     }
     const positionIds = await keeperHelper.getExpiredOptions(nft);
     console.log('👉 closing positionIds:', positionIds);
-    await keeperHelper.batchCloseOptions(nft, positionIds);
+    if(positionIds.length > 0) {
+        await keeperHelper.batchCloseOptions(nft, positionIds);
+    }
     console.log('PositionIds closed');
 }
 
