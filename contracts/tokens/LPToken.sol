@@ -71,23 +71,21 @@ contract LPToken is ILPToken, ERC4626, Ownable, SimpleInitializable {
     }
 
     function lockedBalanceOf(address user) public override view returns(uint256) {
+        if(_lockedBalances[user].releaseTime > 0 && block.timestamp >= _lockedBalances[user].releaseTime){
+            return 0;
+        }
         return _lockedBalances[user].lockedBalance;
+    }
+
+    function balanceOf(address user) public override(ERC20, IERC20) virtual view returns(uint256) {
+        if(_lockedBalances[user].releaseTime > 0 && block.timestamp >= _lockedBalances[user].releaseTime){
+            return super.balanceOf(user) + _lockedBalances[user].lockedBalance;
+        }
+        return super.balanceOf(user);
     }
 
     function releaseTime(address user) public override view returns(uint256) {
         return _lockedBalances[user].releaseTime;
-    }
-
-    function claim(address user) public override returns(uint256 shares) {
-        if(block.timestamp < _lockedBalances[user].releaseTime){
-            revert ClaimBeforeReleaseTime(address(this), user, _lockedBalances[user].releaseTime, block.timestamp);
-        }
-        shares = _lockedBalances[user].lockedBalance;
-        if(shares > 0){
-            _mint(user, shares);
-            _totalLockedBalance -= shares;
-            emit Claim(user, shares);
-        }
     }
 
     function totalAssets() public view override returns (uint256) {
@@ -217,6 +215,7 @@ contract LPToken is ILPToken, ERC4626, Ownable, SimpleInitializable {
         // assets are transferred and before the shares are minted, which is a valid state.
         // slither-disable-next-line reentrancy-no-eth
         SafeERC20.safeTransferFrom(IERC20(asset()), caller, address(this), assets);
+        _claim(receiver);
         _lockedBalances[receiver].lockedBalance += shares;
         _totalLockedBalance +=  shares;
         _lockedBalances[receiver].releaseTime = block.timestamp + LOCK_PERIOD;
@@ -298,5 +297,33 @@ contract LPToken is ILPToken, ERC4626, Ownable, SimpleInitializable {
         Math.Rounding /*rounding*/
     ) internal pure override returns (uint256 assets) {
         return shares;
+    }
+
+    function _claim(address user) internal returns(uint256 shares) {
+        if(_lockedBalances[user].releaseTime > 0 && block.timestamp < _lockedBalances[user].releaseTime){
+            return 0;
+        }
+        shares = _lockedBalances[user].lockedBalance;
+        if(shares > 0){
+            _lockedBalances[user].lockedBalance -= shares;
+            _lockedBalances[user].releaseTime = 0;
+            _totalLockedBalance -= shares;
+            _mint(user, shares);
+            emit Claim(user, shares);
+        }
+    }
+
+     function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual override {
+        if (from != address(0)) { // transfer or burn
+            _claim(from);
+        }
+        else { // mint
+            _claim(to);
+        }
+        super._beforeTokenTransfer(from, to, amount);
     }
 }

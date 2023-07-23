@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: ISC
 pragma solidity 0.8.17;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -19,6 +19,8 @@ import {OptionToken} from "../tokens/OptionToken.sol";
 
 import "../interfaces/IVault.sol";
 
+import "hardhat/console.sol";
+
 contract Vault is IVault, Pausable, Ownable{
     using StorageSlot for bytes32;
     using PercentageMath for uint256;
@@ -31,6 +33,7 @@ contract Vault is IVault, Pausable, Ownable{
     address private _riskCache;
     address private _pricer;
     address private _reserve;
+    address private _keeper;
     uint256 private _nextId = 1;    mapping(address => CollectionConfiguration) private _collections;
     mapping(uint256 => address) private _collectionsList;
     mapping(uint256 => Strike) private _strikes;
@@ -66,6 +69,22 @@ contract Vault is IVault, Pausable, Ownable{
         _pricer = pricer;
         _riskCache = riskCache;
         _reserve = reserve_;
+        _keeper = owner();
+    }
+
+    modifier onlyKeeper() {
+        if (msg.sender != _keeper) {
+            revert OnlyKeeper(address(this), msg.sender, _keeper);
+        }
+        _;
+    }
+
+    function keeper() public override view returns(address) {
+        return _keeper;
+    }
+
+    function setKeeper(address keeperAddress) public override onlyOwner {
+        _keeper = keeperAddress;
     }
 
     function reserve() public override view returns(address) {
@@ -82,7 +101,7 @@ contract Vault is IVault, Pausable, Ownable{
         int256 newPNL = 0;
         for(uint256 i = 0; i < _collectionsCount; i++){
             address collection = _collectionsList[i];
-            CollectionConfiguration storage config = _collections[collection];
+            CollectionConfiguration memory config = _collections[collection];
             if(config.activated){
                 (,int256 PNL) = IAssetRiskCache(_riskCache).getAssetRisk(collection);
                 newPNL += PNL;
@@ -98,10 +117,6 @@ contract Vault is IVault, Pausable, Ownable{
 
     function deposit(uint256 amount, address onBehalfOf) public override{
         LPToken(_lpToken).deposit(amount, msg.sender, onBehalfOf);
-    }
-
-    function claimLPToken(address user) public override{
-        LPToken(_lpToken).claim(user);
     }
 
     function withdraw(uint256 amount, address to) public override returns(uint256){
@@ -157,7 +172,7 @@ contract Vault is IVault, Pausable, Ownable{
     }
 
     function maximumOptionAmount(address collection, OptionType optionType) external view override returns(uint256 amount) {
-        CollectionConfiguration storage config = _collections[collection];
+        CollectionConfiguration memory config = _collections[collection];
         uint256 currentAmount = IERC20(_asset).balanceOf(_lpToken);
         uint256 totalLockedValue = OptionToken(config.optionToken).totalValue();
         uint256 maximumLockedValueOfCollection = _maximumLockedValueOfCollection(config, currentAmount);
@@ -213,7 +228,7 @@ contract Vault is IVault, Pausable, Ownable{
         return (positionId, premium);
     }
 
-    function activePosition(address collection, uint256 positionId) public override onlyOwner returns(uint256 premium){
+    function activePosition(address collection, uint256 positionId) public override onlyKeeper returns(uint256 premium){
         OptionToken optionToken = OptionToken(_collections[collection].optionToken);
         OptionPosition memory position = optionToken.optionPosition(positionId);
         Strike memory strike_ = _strikes[position.strikeId];
@@ -234,12 +249,13 @@ contract Vault is IVault, Pausable, Ownable{
         //transfer premium from the caller to the vault
         uint256 amountToReserve = premium.percentMul(RESERVE_RATIO);
         _strikes[position.strikeId] = strike_;
-        emit ReceivePremium(msg.sender, amountToReserve, premium - amountToReserve);
-        IERC20(_asset).safeTransferFrom(msg.sender, _reserve, amountToReserve);
-        IERC20(_asset).safeTransferFrom(msg.sender, _lpToken, premium - amountToReserve);
+        address owner = optionToken.ownerOf(positionId);
+        emit ReceivePremium(owner, amountToReserve, premium - amountToReserve);
+        IERC20(_asset).safeTransferFrom(owner, _reserve, amountToReserve);
+        IERC20(_asset).safeTransferFrom(owner, _lpToken, premium - amountToReserve);
     }
 
-    function closePosition(address collection, address to, uint256 positionId) public override onlyOwner returns(uint256 profit){
+    function closePosition(address collection, uint256 positionId) public override onlyKeeper returns(uint256 profit){
         //calculate fee
         //burn callOption token
         //transfer revenue from the vault to caller
@@ -277,6 +293,7 @@ contract Vault is IVault, Pausable, Ownable{
         uint256 fee;
         (profit, fee) = _calculateExerciseProfit(position.optionType, currentPrice, strike_.strikePrice, position.amount);
         if(profit != 0){
+            address to = optionToken.ownerOf(positionId);
             _realizedPNL -= int256(profit + fee);
             IERC20(_asset).safeTransferFrom(_lpToken, _reserve, fee);
             IERC20(_asset).safeTransferFrom(_lpToken, to, profit);
@@ -285,13 +302,13 @@ contract Vault is IVault, Pausable, Ownable{
         return profit;
     }
 
-    function forceClosePendingPosition(address collection, uint256 positionId) public override onlyOwner {
+    function forceClosePendingPosition(address collection, uint256 positionId) public override onlyKeeper {
         OptionToken optionToken = OptionToken(_collections[collection].optionToken);
         _totalLockedAssets -= optionToken.lockedValue(positionId);
         uint256 strikeId = optionToken.optionPosition(positionId).strikeId;
         delete _strikes[strikeId];
         emit DestoryStrike(strikeId);
-        optionToken.forceClosePosition(positionId);
+        optionToken.forceClosePendingPosition(positionId);
     }
 
     function _calculateExerciseProfit(OptionType optionType, uint256 currentPrice, uint256 strikePrice, uint256 amount) internal view returns(uint256, uint256){

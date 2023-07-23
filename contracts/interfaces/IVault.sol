@@ -29,19 +29,21 @@ interface IVault {
     event ReceivePremium(address indexed user, uint256 amountToReserve, uint256 amountToLiquidityPool);
     event SendRevenue(address indexed receiver, uint256 amount, uint256 fee);
     event CreateMarket(address indexed collection, uint32 weight, address optionToken);
+    event KeeperAddressUpdated(address indexed keeperAddress);
 
+    function keeper() external view returns(address);
+    function setKeeper(address keeperAddress) external;
     function reserve() external view returns(address);
     function unrealizedPNL() external view returns(int256);
     function updateUnrealizedPNL() external returns(int256);
     function unrealizedPremium() external view returns(uint256);
     function deposit(uint256 amount, address onBehalfOf) external;
-    function claimLPToken(address user) external;
     function withdraw(uint256 amount, address to) external returns(uint256);
     function totalAssets() external view returns(uint256);
     function totalLockedAssets() external view returns(uint256);
     function openPosition(address collection, address onBehalfOf, OptionType optionType, uint256 strikePrice, uint256 expiry, uint256 amount) external returns(uint256 positionId, uint256 premium);
     function activePosition(address collection, uint256 positionId) external returns(uint256 premium);
-    function closePosition(address collection, address to, uint256 positionId) external returns(uint256);
+    function closePosition(address collection, uint256 positionId) external returns(uint256);
     function forceClosePendingPosition(address collection, uint256 positionId) external;
     function strike(uint256 strikeId) external view returns(Strike memory);
     function addMarket(address collection, uint32 weight, address optionToken) external returns(uint32);
@@ -60,5 +62,6 @@ interface IVault {
     error PositionNotExpired(address thrower, uint256 positionId, uint256 expiry, uint256 blockTimestamp);
     error RevenueTransferFailed(address thrower, address receiver, uint256 revenue);
     error CollectionAlreadyExists(address thrower, address collection);
+    error OnlyKeeper(address thrower, address caller, address keeper);
 }
 

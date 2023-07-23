@@ -89,7 +89,6 @@ contract OptionPricer is IPricer, Ownable, SimpleInitializable {
 
   function getPremium(OptionType ot, uint S, uint K, uint vol, uint duration) public view override returns (uint) {
     (uint call, uint put) = optionPrices(S, K, vol, duration);
-    console.log("got price: %s, %s", call, put);
     if (ot == OptionType.LONG_CALL)
       return call;
     else if (ot == OptionType.LONG_PUT)
@@ -98,7 +97,7 @@ contract OptionPricer is IPricer, Ownable, SimpleInitializable {
       return 0;
   }
 
-  function optionPrices(uint S, uint K, uint vol, uint duration) public view returns (uint call, uint put) {
+  function optionPrices(uint S, uint K, uint vol, uint duration) public view override returns (uint call, uint put) {
     uint decimalsDiff = 10 ** (DecimalMath.decimals-GENERAL_DECIMALS);
     BlackScholes.BlackScholesInputs memory bsInput = BlackScholes.BlackScholesInputs(
       duration,
@@ -107,11 +106,20 @@ contract OptionPricer is IPricer, Ownable, SimpleInitializable {
       K,
       riskFreeRate * int(decimalsDiff)
     );
-    console.log('duration: %s, vol: %s,  riskFreeRate: %s', duration, vol, uint256(bsInput.rateDecimal));
-    console.log('strike price: %s, spot price: %s', K, S);
     (call, put) = BlackScholes.optionPrices(bsInput);
-    call /= decimalsDiff;
-    put /= decimalsDiff;
+  }
+
+  function delta(uint S, uint K, uint vol, uint duration) public view override returns (int callDelta, int putDelta) {
+    uint decimalsDiff = 10 ** (DecimalMath.decimals-GENERAL_DECIMALS);
+    BlackScholes.BlackScholesInputs memory bsInput = BlackScholes.BlackScholesInputs(
+      duration,
+      vol,
+      S,
+      K,
+      riskFreeRate * int(decimalsDiff)
+    );
+    (callDelta, putDelta) = BlackScholes.delta(bsInput);
+    return (callDelta, putDelta);
   }
 
   function updatePricerParams(uint skewP1, uint skewP2, uint deltaP1, uint deltaP2) external onlyOwner {

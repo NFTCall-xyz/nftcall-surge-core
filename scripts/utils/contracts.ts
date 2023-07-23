@@ -1,5 +1,5 @@
 import { BigNumber, ContractTransaction } from 'ethers';
-import { DRE, bigNumber, getDb } from './';
+import { DRE, bigNumber, getDb, sleep } from './';
 import { 
     ERC20,
     ERC721,
@@ -13,6 +13,7 @@ import {
     MintableERC20,
     MintableERC721,
     BlackScholes,
+    KeeperHelper,
 } from '../../types';
 
 function getKey(name: string, marketName?: string) {
@@ -56,6 +57,19 @@ export const getContract = async<T>(contractName: string, dbName?: string, addre
     return (await DRE.ethers.getContractAt(contractName, addr)) as T;
 }
 
+export const verifyContract = async (name: string, contractAddress: string, ...args: any) => {
+    console.log(`⭐️  Verify ${name} at`, contractAddress);
+    try {
+        // npx hardhat verify --network network
+        await DRE.run("verify:verify", {
+            address: contractAddress,
+            constructorArguments: args,
+        });
+    } catch (error) {
+        console.log("❌ Verified Error, Please check on scan.", error);
+    };
+};
+
 export const getTxConfig = () => {
     let txConfig = {}
     if (process.env.maxPriorityFeePerGas && process.env.maxFeePerGas && process.env.gasLimit) {
@@ -69,7 +83,7 @@ export const getTxConfig = () => {
     return txConfig;
 }
 
-export const deployContract = async<T> (contractName: string, args: any[], dbName?: string, marketName?: string, libraries?: {[key: string]: string}) => {
+export const deployContract = async<T> (contractName: string, args: any[], dbName?: string, marketName?: string, libraries?: {[key: string]: string}, verify: boolean = false) => {
     const name = dbName ?? contractName;
     console.log(`Deploying ${name} contract...`);
     const contractFactory = (libraries === undefined)
@@ -81,17 +95,24 @@ export const deployContract = async<T> (contractName: string, args: any[], dbNam
     console.log(`✅  Deployed ${name} contract at ${contract.address}`);
     
     await saveAddress(name, contract.address, marketName);
+
+    if (verify) {
+        const second = 30;
+        console.log(`🍵 Wait ${second} seconds for verify...`);
+        await sleep(second);
+        await verifyContract(name, contract.address, ...args);
+    }
     return contract as T;
 }
 
 export const deployLPToken = async (erc20Asset: string, name: string, symbol: string, verify: boolean = false) => {
     console.log(`Deploying LPToken contract for ${erc20Asset}...`);
-    const lpToken = await deployContract<LPToken>('LPToken', [erc20Asset, name, symbol]);
+    const lpToken = await deployContract<LPToken>('LPToken', [erc20Asset, name, symbol], undefined, undefined, undefined, verify);
     return lpToken;
 }
 
 export const deployOracle = async (operator: string, verify: boolean = false) => {
-    const oracle = await deployContract<NFTCallOracle>('NFTCallOracle', [operator, []]);
+    const oracle = await deployContract<NFTCallOracle>('NFTCallOracle', [operator, []], undefined, undefined, undefined, verify);
     return oracle;
 }
 
@@ -104,44 +125,49 @@ export const deployPricer = async (verify: boolean = false) => {
     const libraries = {
         ["contracts/libraries/BlackScholes.sol:BlackScholes"]: blackScholesAddress,
     };
-    const pricer = await deployContract<OptionPricer>('OptionPricer', [], undefined, undefined, libraries);
+    const pricer = await deployContract<OptionPricer>('OptionPricer', [], undefined, undefined, libraries, verify);
     return pricer;
 }
 
 export const deployRiskCache = async (verify: boolean = false) => {
-    const riskCache = await deployContract<AssetRiskCache>('AssetRiskCache', []);
+    const riskCache = await deployContract<AssetRiskCache>('AssetRiskCache', [], undefined, undefined, undefined, verify);
     return riskCache;
 }
 
 export const deployOptionToken = async (nftAddress: string, name: string, symbol: string, baseURI: string, marketName: string, verify: boolean = false) => {
-    const optionToken = await deployContract<OptionToken>('OptionToken', [nftAddress, name, symbol, baseURI], undefined, marketName);
+    const optionToken = await deployContract<OptionToken>('OptionToken', [nftAddress, name, symbol, baseURI], undefined, marketName, undefined, verify);
     return optionToken;
 }
 
 export const deployVault = async (asset: string, lpToken: string, oracle: string, pricer: string, riskCache: string, reserve: string, verify: boolean = false) => {
     
-    const vault = await deployContract<Vault>('Vault', [asset, lpToken, oracle, pricer, riskCache, reserve]);
+    const vault = await deployContract<Vault>('Vault', [asset, lpToken, oracle, pricer, riskCache, reserve], undefined, undefined, undefined, verify);
     return vault;
 }
 
 export const deployReserve = async (verify: boolean = false) => {
-    const reserve = await deployContract<Reserve>('Reserve', []);
+    const reserve = await deployContract<Reserve>('Reserve', [], undefined, undefined, undefined, verify);
     return reserve;
 }
 
 export const deployMintableERC20 = async (name: string, symbol: string, verify: boolean = false) => {
-    const erc20 = await deployContract<MintableERC20>('MintableERC20', [name, symbol], symbol);
+    const erc20 = await deployContract<MintableERC20>('MintableERC20', [name, symbol], symbol, undefined, undefined, verify);
     return erc20;
 }
 
 export const deployMintableERC721 = async (name: string, symbol: string, verify: boolean = false) => {
-    const erc721 = await deployContract<MintableERC721>('MintableERC721', [name, symbol], symbol);
+    const erc721 = await deployContract<MintableERC721>('MintableERC721', [name, symbol], symbol, undefined, undefined, verify);
     return erc721;
 }
 
 export const deployBlackScholes = async (verify: boolean = false) => {
-    const blackScholes = await deployContract<BlackScholes>('BlackScholes', []);
+    const blackScholes = await deployContract<BlackScholes>('BlackScholes', [], undefined, undefined, undefined, verify);
     return blackScholes;
+}
+
+export const deployKeeperHelper = async (vault: string, verify: boolean = false) => {
+    const keeperHelper = await deployContract<KeeperHelper>('KeeperHelper', [vault], undefined, undefined, undefined, verify);
+    return keeperHelper;
 }
 
 export const getVault = async () => {
@@ -190,6 +216,10 @@ export const getMintableERC721 = async (symbol: string) => {
 
 export const getBlackScholes = async() => {
     return await getContract<BlackScholes>('BlackScholes');
+}
+
+export const getKeeperHelper = async() => {
+    return await getContract<KeeperHelper>('KeeperHelper');
 }
 
 export const initializeLPToken = async(maximumTotalAssets: BigNumber) => {

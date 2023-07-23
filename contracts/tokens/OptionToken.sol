@@ -21,6 +21,7 @@ contract OptionToken is IOptionToken, ERC721Enumerable, Ownable, SimpleInitializ
     address private _vault;
     uint256 internal constant _decimals = DECIMALS;
     uint256 private _totalValue;
+    uint256 private _totalAmount;
     uint256 private _nextId = 1;
     string private _baseTokenURI;
 
@@ -84,6 +85,7 @@ contract OptionToken is IOptionToken, ERC721Enumerable, Ownable, SimpleInitializ
         }
         po.state = PositionState.ACTIVE;
         po.premium = premium;
+        _totalAmount += po.amount;
         emit ActivePosition(positionId, premium);
     }
 
@@ -92,11 +94,12 @@ contract OptionToken is IOptionToken, ERC721Enumerable, Ownable, SimpleInitializ
         if(_options[positionId].state != PositionState.ACTIVE) {
             revert IsNotActive(address(this), positionId, _options[positionId].state);
         }
+        _totalAmount -= _options[positionId].amount;
         _closePosition(positionId);
         emit ClosePosition(positionId);
     }
 
-    function forceClosePosition(uint256 positionId) public override onlyVault
+    function forceClosePendingPosition(uint256 positionId) public override onlyVault
     {
         if(_options[positionId].state != PositionState.PENDING) {
             revert IsNotPending(address(this), positionId, _options[positionId].state);
@@ -109,6 +112,10 @@ contract OptionToken is IOptionToken, ERC721Enumerable, Ownable, SimpleInitializ
         _totalValue -= lockedValue(positionId);
         delete _options[positionId];
         _burn(positionId);
+    }
+
+    function totalAmount() public override view returns(uint256) {
+        return _totalAmount;
     }
 
     function totalValue() public override view returns(uint256) 
@@ -133,6 +140,7 @@ contract OptionToken is IOptionToken, ERC721Enumerable, Ownable, SimpleInitializ
         if(position.state == PositionState.EMPTY) {
             revert NonexistentPosition(address(this), positionId);
         }
+        return position;
     }
 
     function optionPositionState(uint256 positionId) public view override returns(PositionState state) {
@@ -140,5 +148,6 @@ contract OptionToken is IOptionToken, ERC721Enumerable, Ownable, SimpleInitializ
         if(state == PositionState.EMPTY){
             revert NonexistentPosition(address(this), positionId);
         }
+        return state;
     }
 }

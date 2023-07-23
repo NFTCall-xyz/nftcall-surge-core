@@ -35,11 +35,12 @@ interface IOptionToken {
     function openPosition(address to, OptionType optionType, uint256 strikeId, uint256 amount) external returns(uint256 positionId);
     function activePosition(uint256 positionId, uint256 premium) external;
     function closePosition(uint256 positionId) external;
-    function forceClosePosition(uint256 positionId) external;
+    function forceClosePendingPosition(uint256 positionId) external;
     function optionPositionState(uint256 positionId) external view returns(PositionState);
     function optionPosition(uint256 positionId) external view returns(OptionPosition memory);
     function lockedValue(uint256 positionId) external view returns(uint256);
     function totalValue() external view returns(uint256);
+    function totalAmount() external view returns(uint256);
 
     error OnlyVault(address thrower, address caller, address vault);
     error ZeroVaultAddress(address thrower);

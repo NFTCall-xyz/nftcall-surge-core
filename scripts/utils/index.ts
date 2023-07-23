@@ -39,3 +39,13 @@ export const getDb = (marketName?: string) => {
 export const bigNumber = (number: number, decimals: number = 0) => {
     return BigNumber.from(number).mul(BigNumber.from(10).pow(decimals));
 }
+
+export const getMarkets = async () => {
+    const optionTokens = Object.keys((await getMarketDb().get(`OptionToken.${DRE.network.name}`)).value());
+    return optionTokens;
+}
+
+export const sleep = (second: number) => {
+    return new Promise((resolve) => setTimeout(resolve, 1000 * second));
+};
+
