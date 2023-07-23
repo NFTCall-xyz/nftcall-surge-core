@@ -102,7 +102,7 @@ contract KeeperHelper is Ownable{
         IVault vault_ = IVault(_vault);
         for(uint256 i = 0; i < positionIds.length; ++i){
             uint256 positionId = positionIds[i];
-            vault_.activePosition(collection, positionId);
+            vault_.activatePosition(collection, positionId);
         }
     }
 

@@ -61,6 +61,7 @@ interface IVault {
     function MINIMUM_PUT_STRIKE_PRICE_RATIO() external view returns(uint256);
     function MAXIMUM_DURATION() external view returns(uint256);
     function MINIMUM_DURATION() external view returns(uint256);
+    function TIME_SCALE() external view returns(uint256);
     
     function keeper() external view returns(address);
     function setKeeper(address keeperAddress) external;
@@ -72,11 +73,13 @@ interface IVault {
     function unrealizedPremium() external view returns(uint256);
     function deposit(uint256 amount, address onBehalfOf) external;
     function withdraw(uint256 amount, address to) external returns(uint256);
+    function redeem(uint256 amount, address to) external returns(uint256);
     function totalAssets() external view returns(uint256);
     function totalLockedAssets() external view returns(uint256);
     function estimatePremium(address collection, OptionType optionType, uint256 strikePrice, uint256 expiry, uint256 amount) external view returns(uint256 premium);
+    function adjustedVolatility(address collection, OptionType optionType, uint256 strikePrice, uint256 amount) external view returns(uint256);
     function openPosition(address collection, address onBehalfOf, OptionType optionType, uint256 strikePrice, uint256 expiry, uint256 amount, uint256 maximumPremium) external returns(uint256 positionId, uint256 premium);
-    function activePosition(address collection, uint256 positionId) external returns(uint256 premium, int256 delta);
+    function activatePosition(address collection, uint256 positionId) external returns(uint256 premium, int256 delta);
     function positionPNLWeightedDelta(address collection, uint256 positionId) external view returns(int256 unrealizePNL, int256 weightedDelta);
     function closePosition(address collection, uint256 positionId) external returns(uint256);
     function forceClosePendingPosition(address collection, uint256 positionId) external;

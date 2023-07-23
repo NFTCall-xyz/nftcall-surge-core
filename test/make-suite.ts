@@ -1,4 +1,4 @@
-import { Signer } from 'ethers';
+import { BigNumber, Signer } from 'ethers';
 
 import { DRE } from '../scripts/utils';
 import {
@@ -51,12 +51,14 @@ export interface TestEnv {
     lpToken?: LPToken;
     keeperHelper?: KeeperHelper;
     eth?: MintableERC20;
+    timeScale: BigNumber;
     markets: {[key:string]: Market};
 };
 
 export const testEnv: TestEnv = {
     users: [],
     markets: {},
+    timeScale: BigNumber.from(1),
 } as TestEnv;
 
 
@@ -77,6 +79,8 @@ export const initializeMakeSuite = async () => {
     };
     testEnv.oracle = await getOracle();
     testEnv.vault = await getVault();
+    if(testEnv.vault === undefined) throw new Error(`Vault not found`);
+    testEnv.timeScale = await testEnv.vault.TIME_SCALE();
     testEnv.reserve = await getReserve();
     testEnv.backstopPool = await getBackstopPool();
     testEnv.pricer = await getPricer();

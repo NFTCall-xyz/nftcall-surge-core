@@ -21,7 +21,7 @@ export const activateOptions = async (market: string) => {
             let failedPositions = [];
             for(const positionId of positionIds) {
                 try {
-                    await waitTx(await vault.activePosition(nft, positionId));
+                    await waitTx(await keeperHelper.batchActivateOptions(nft, [positionId]));
                 }
                 catch (error) {
                     failedPositions.push(positionId);
@@ -46,11 +46,50 @@ export const cloesOptions = async (market: string) => {
     );*/
     console.log('👉 closing positionIds:', positionIds);
     if(positionIds.length > 0) {
-        for(const positionId of positionIds){
-            await waitTx(await keeperHelper.batchCloseOptions(nft, [positionId]));
+        try{
+            await waitTx(await keeperHelper.batchCloseOptions(nft, positionIds));
+        } catch (error) {
+            for(const positionId of positionIds){
+                try {
+                    await waitTx(await keeperHelper.batchCloseOptions(nft, [positionId]));
+                }
+                catch (error) {
+                    console.log('👉 failed to close positionId:', positionId);
+                    console.log(error);
+                }
+            }
         }
     }
     console.log('PositionIds closed');
+    return positionIds.length;
+}
+
+export const cancelOptions = async (market: string, positionIds: BigNumber[]) => {
+    const keeperHelper = await getKeeperHelper();
+    const vault = await getVault();
+    const nft = await getAddress(market);
+    if(keeperHelper === undefined || vault === undefined) {
+        throw Error('KeeperHelper is not deployed');
+    }
+    console.log('👉 canceling positionIds:', positionIds);
+    if(positionIds.length > 0) {
+        try {
+            await waitTx(await keeperHelper.batchForceClosePendingPositions(nft, positionIds));
+        } catch (error) {
+            let failedPositions = [];
+            for(const positionId of positionIds) {
+                try {
+                    await waitTx(await keeperHelper.batchForceClosePendingPositions(nft, [positionId]));
+                }
+                catch (error) {
+                    failedPositions.push(positionId);
+                    console.log('👉 failed to cancel positionId:', positionId);
+                    console.log(error);
+                }
+            }
+        }
+    }
+    console.log('PositionIds canceled');
     return positionIds.length;
 }
 
@@ -123,6 +162,7 @@ export const resetRisk = async (market: string) => {
 }
 
 export const processMarket = async (market: string) => {
+    console.log(`Processing market: ${market}`);
     const closedPositions = await cloesOptions(market);
     const needToUpdatePNL = await updateRisk(market, closedPositions > 0);
     await activateOptions(market);

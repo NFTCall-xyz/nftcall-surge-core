@@ -60,6 +60,7 @@ contract Vault is IVault, Pausable, Ownable{
     uint256 public override constant MAXIMUM_PUT_STRIKE_PRICE_RATIO = GENERAL_UNIT * 90 / 100; // 90%
     uint256 public override constant MINIMUM_PUT_STRIKE_PRICE_RATIO = GENERAL_UNIT * 50 / 100; // 50%
     uint256 public override constant KEEPER_FEE = 5 * 10**13; // 0.00005 ETH
+    uint256 public override constant TIME_SCALE = 1;
 
     uint256 public override constant MINIMUM_DURATION = 3 days;
     uint256 public override constant MAXIMUM_DURATION = 30 days;
@@ -195,6 +196,10 @@ contract Vault is IVault, Pausable, Ownable{
         return LPToken(_lpToken).withdraw(amount, to, msg.sender);
     }
 
+    function redeem(uint256 amount, address to) public override onlyUnpaused returns(uint256){
+        return LPToken(_lpToken).redeem(amount, to, msg.sender);
+    }
+
     function totalAssets() public view override returns(uint256) {
         return LPToken(_lpToken).totalAssets();
     }
@@ -267,9 +272,16 @@ contract Vault is IVault, Pausable, Ownable{
         }
     }
 
-    function _adjustedPremium(address collection, OptionType optionType, Strike memory strike_) internal view returns(uint256 premium){
+    function _adjustedPremium(address collection, OptionType optionType, Strike memory strike_, uint256 amount) internal view returns(uint256 premium){
         IPricer pricer = IPricer(_pricer);
-        uint256 adjustedVol = pricer.getAdjustedVol(collection, optionType, strike_.strikePrice);
+        uint256 lockedValue;
+        if(optionType == OptionType.LONG_CALL){
+            lockedValue = strike_.entryPrice.mulDiv(amount, UNIT, Math.Rounding.Up);
+        }
+        else {
+            lockedValue = strike_.strikePrice.mulDiv(amount, UNIT, Math.Rounding.Up);
+        }
+        uint256 adjustedVol = pricer.getAdjustedVol(collection, optionType, strike_.strikePrice, lockedValue);
         (uint256 call, uint256 put) = pricer.optionPrices(strike_.entryPrice, strike_.strikePrice, adjustedVol, strike_.duration);
         if(optionType == OptionType.LONG_CALL){
             premium = call;
@@ -303,7 +315,7 @@ contract Vault is IVault, Pausable, Ownable{
         strike_.expiry = expiry;
         strike_.duration = expiry - block.timestamp;
         _validateOpenOption1(amount, optionType, strike_);
-        premium = _adjustedPremium(collection, optionType, strike_);
+        premium = _adjustedPremium(collection, optionType, strike_, amount);
         premium = premium.mulDiv(amount, UNIT, Math.Rounding.Up);
         _validateOpenOption2(config, strike_.entryPrice.mulDiv(amount, UNIT, Math.Rounding.Up), premium);
         return (premium, strike_);
@@ -314,6 +326,19 @@ contract Vault is IVault, Pausable, Ownable{
     {
         (premium, ) = _estimatePremium(collection, optionType, strikePrice, expiry, amount);
         return premium;
+    }
+
+    function adjustedVolatility(address collection, OptionType optionType, uint256 strikePrice, uint256 amount) public view override returns(uint256 adjustedVol){
+        IPricer pricer = IPricer(_pricer);
+        uint256 lockedValue;
+        uint256 entryPrice = IOracle(_oracle).getAssetPrice(collection);
+        if(optionType == OptionType.LONG_CALL){
+            lockedValue = entryPrice.mulDiv(amount, UNIT, Math.Rounding.Up);
+        }
+        else {
+            lockedValue = strikePrice.mulDiv(amount, UNIT, Math.Rounding.Up);
+        }
+        return pricer.getAdjustedVol(collection, optionType, strikePrice, lockedValue);
     }
 
     //for options
@@ -349,7 +374,7 @@ contract Vault is IVault, Pausable, Ownable{
         return (positionId, premium);
     }
 
-    function activePosition(address collection, uint256 positionId) public override onlyKeeper onlyUnpaused returns(uint256 premium, int256 delta){
+    function activatePosition(address collection, uint256 positionId) public override onlyKeeper onlyUnpaused returns(uint256 premium, int256 delta){
         if(_collections[collection].frozen){
             revert FrozenMarket(address(this), collection);
         }
@@ -361,7 +386,7 @@ contract Vault is IVault, Pausable, Ownable{
         Strike memory strike_ = _strikes[position.strikeId];
         strike_.duration = strike_.expiry - block.timestamp;
         strike_.entryPrice = IOracle(_oracle).getAssetPrice(collection);
-        premium = _adjustedPremium(collection, position.optionType, strike_);
+        premium = _adjustedPremium(collection, position.optionType, strike_, position.amount);
         premium = premium.mulDiv(position.amount, UNIT, Math.Rounding.Up);
         if(premium > position.maximumPremium){
             emit FailPosition(optionToken.ownerOf(positionId), collection, positionId, position.maximumPremium);
@@ -383,6 +408,7 @@ contract Vault is IVault, Pausable, Ownable{
             _strikes[position.strikeId] = strike_;
             address payer = position.payer;
             uint256 excessPremium = position.maximumPremium - premium;
+            LPToken(_lpToken).increaseTotalAssets(premium - amountToReserve);
             emit ActivatePosition(optionToken.ownerOf(positionId), collection, positionId, premium, excessPremium, delta);
             IERC20(_asset).safeTransfer(_reserve, amountToReserve + KEEPER_FEE);
             IERC20(_asset).safeTransfer(_lpToken, premium - amountToReserve);
@@ -438,6 +464,7 @@ contract Vault is IVault, Pausable, Ownable{
         (profit, fee) = _calculateExerciseProfit(position.optionType, settlementPrice, strike_.entryPrice, strike_.strikePrice, position.amount);
         if(profit != 0){
             _realizedPNL -= int256(profit + fee);
+            LPToken(_lpToken).decreaseTotalAssets(profit + fee);
             emit ExercisePosition(to, collection, positionId, profit, fee, settlementPrice);
             IERC20(_asset).safeTransferFrom(_lpToken, _backstopPool, fee);
             IERC20(_asset).safeTransferFrom(_lpToken, to, profit);

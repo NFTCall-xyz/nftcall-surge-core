@@ -1,22 +1,6 @@
 import { task } from 'hardhat/config';
-import { 
-    getAddress,
-    getLPToken,
-    getOracle,
-    getPricer,
-    getRiskCache,
-    getReserve,
-    getVault,
-    deployVault,
-    initializeMarket,
-} from '../scripts/utils/contracts';
-
-import {
-    getMarkets
-} from '../scripts/utils';
-
 import { BigNumber } from 'ethers';
-import { processAllMarkets, resetRisk } from '../scripts/keeper';
+import { processAllMarkets, resetRisk, cancelOptions } from '../scripts/keeper';
 
 task('keeper:fullUpdate', 'Full update')
     .setAction(async ({ }, hre) => {
@@ -29,4 +13,12 @@ task('keeper:resetRisk', 'Reset the risk of a market')
     .setAction(async({market}, hre) => {
         await hre.run('set-DRE');
         await resetRisk(market);
+    })
+
+task('keeper:cancelOptions', 'cancel options')
+    .addParam('market', 'The market to reset')
+    .addVariadicPositionalParam('positionIds', 'The positionIds to cancel')
+    .setAction(async({market, positionIds}, hre) => {
+        await hre.run('set-DRE');
+        await cancelOptions(market, positionIds.map((el: string) => BigNumber.from(el)));
     })
