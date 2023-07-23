@@ -1,5 +1,5 @@
 import { task } from 'hardhat/config';
-import { saveAddress } from '../scripts/utils/contracts';
+import { saveAddress, getAddress } from '../scripts/utils/contracts';
 import { DRE, bigNumber } from '../scripts/utils';
 
 task('dev:full', 'Deploy all contracts')
@@ -23,18 +23,23 @@ task('dev:full', 'Deploy all contracts')
             },
         }
         await hre.run('set-DRE');
+        const deployOnDevServer = (DRE.network.name === 'hardhat' || DRE.network.name === 'localhost');
         const accounts = await DRE.ethers.getSigners();
-        const [, , operator, ] = accounts;
-        // const operator = getAddress('operator');
+        console.log(`deployer address: ${await accounts[0].getAddress()}`);
+        console.log(`accounts length: ${Object.keys(accounts).length}`);
+        // const [, , operator, ] = accounts;
+        const operator = accounts[1] || accounts[0];
         if(!operator) throw new Error(`Operator not found`);
         const operatorAddress = await operator.getAddress();
         saveAddress('operator', operatorAddress);
         await hre.run('mocked:erc20:deploy', { verify, symbol: lpAsset, name: lpAsset});
-        for(const [nft, market] of Object.entries(markets)) {
-            await hre.run('mocked:erc721:deploy', { verify, symbol: nft, name: market.name});
+        if(DRE.network.name === 'hardhat' || DRE.network.name === 'localhost') {
+            for(const [nft, market] of Object.entries(markets)) {
+                await hre.run('mocked:erc721:deploy', { verify, symbol: nft, name: market.name});
+            }
         }
         await hre.run('oracle:deploy', { verify, operator: operatorAddress});
-        await hre.run('lpToken:deploy', { verify, underlying: lpAsset });
+        await hre.run('lpToken:deploy', { verify, underlying: lpAsset, underlyingName: "WETH" });
         await hre.run('blackScholes:deploy', { verify });
         await hre.run('pricer:deploy', { verify });
         await hre.run('riskCache:deploy', { verify });
