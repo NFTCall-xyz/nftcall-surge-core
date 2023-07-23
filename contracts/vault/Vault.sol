@@ -47,7 +47,7 @@ contract Vault is IVault, Pausable, Ownable{
     uint256 private constant RESERVE_RATIO = PERCENTAGE_FACTOR * 10 / 100; // 10%
     uint256 private FEE_RATIO =  PERCENTAGE_FACTOR * 5 / 1000; // 0.5%
     uint256 private MAXIMUM_FEE_RATIO = PERCENTAGE_FACTOR * 125 / 1000; // 12.5%
-    uint256 public constant PREMIUM_UPSCALE_RATIO = PERCENTAGE_FACTOR * 150 / 100; // 150%
+    uint256 public constant PREMIUM_UPSCALE_RATIO = PERCENTAGE_FACTOR * 105 / 100; // 105%
     
     uint256 public constant MAXIMUM_LOCK_RATIO = PERCENTAGE_FACTOR * 95 / 100; // 95%
     uint256 private constant _decimals = DECIMALS;
@@ -216,7 +216,7 @@ contract Vault is IVault, Pausable, Ownable{
         strike_.duration = expiry - block.timestamp;
         _validateOpenOption1(amount, optionType, strike_);
         uint256 premium = _calculateStrikeAndPremium(collection, optionType, strike_);
-        _validateOpenOption2(config, strike_.spotPrice.mulDiv(amount, UNIT, Math.Rounding.Up), premium);
+        _validateOpenOption2(config, strike_.spotPrice.mulDiv(amount, UNIT, Math.Rounding.Up), premium.mulDiv(amount, UNIT, Math.Rounding.Up));
         uint256 strikeId = _nextId++;
         _strikes[strikeId] = strike_;
         emit CreateStrike(strikeId, strike_.duration, strike_.expiry, strike_.spotPrice, strike_.strikePrice);
@@ -244,15 +244,16 @@ contract Vault is IVault, Pausable, Ownable{
         IPricer pricer = IPricer(_pricer);
         uint256 adjustedVol = pricer.getAdjustedVol(collection, position.optionType, strike_.strikePrice);
         premium = pricer.getPremium(position.optionType, strike_.spotPrice, strike_.strikePrice, adjustedVol, strike_.duration);
-        _unrealizedPremium += premium;
+        uint256 totalPremium = premium.mulDiv(position.amount, UNIT, Math.Rounding.Up);
+        _unrealizedPremium += totalPremium;
         optionToken.activePosition(positionId, premium);
         //transfer premium from the caller to the vault
-        uint256 amountToReserve = premium.percentMul(RESERVE_RATIO);
+        uint256 amountToReserve = totalPremium.percentMul(RESERVE_RATIO);
         _strikes[position.strikeId] = strike_;
         address owner = optionToken.ownerOf(positionId);
-        emit ReceivePremium(owner, amountToReserve, premium - amountToReserve);
+        emit ReceivePremium(owner, amountToReserve, totalPremium - amountToReserve);
         IERC20(_asset).safeTransferFrom(owner, _reserve, amountToReserve);
-        IERC20(_asset).safeTransferFrom(owner, _lpToken, premium - amountToReserve);
+        IERC20(_asset).safeTransferFrom(owner, _lpToken, totalPremium - amountToReserve);
     }
 
     function closePosition(address collection, uint256 positionId) public override onlyKeeper returns(uint256 profit){
