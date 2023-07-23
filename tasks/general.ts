@@ -31,7 +31,7 @@ task('lpToken:deploy', 'Deploy LP Token')
         await hre.run('set-DRE');
         const underlyingAddress = await getAddress(underlying);
         if(!underlyingAddress) throw new Error(`Asset ${underlying} not found`);
-        const lpToken = await deployLPToken(underlyingAddress, `NFTCall ${underlyingName}`, `nc${underlyingName}`, verify);
+        const lpToken = await deployLPToken(underlyingAddress, `NFTCall ${underlyingName} LP Token`, `nc${underlyingName}`, verify);
     });
 
 task('blackScholes:deploy', 'Deploy Black Scholes')
@@ -53,6 +53,16 @@ task('riskCache:deploy', 'Deploy Risk Cache')
     .setAction(async ({ verify }, hre) => {
         await hre.run('set-DRE');
         const riskCache = await deployRiskCache(verify);
+    });
+
+task('riskCache:init', 'Initialize Risk Cache')
+    .setAction(async ({ verify }, hre) => {
+        await hre.run('set-DRE');
+        const riskCache = await getRiskCache();
+        const vault = await getVault();
+        if(!riskCache) throw new Error(`Risk Cache not found`);
+        if(!vault) throw new Error(`Vault not found`);
+        await waitTx(await riskCache.transferOwnership(vault.address));
     });
 
 task('reserve:deploy', 'Deploy Reserve')

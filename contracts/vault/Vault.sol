@@ -6,6 +6,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {Pausable} from "@openzeppelin/contracts/security/Pausable.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import "../libraries/Math.sol" as Math2;
 import {StorageSlot} from "@openzeppelin/contracts/utils/StorageSlot.sol";
 import {GENERAL_UNIT, DECIMALS, UNIT, HIGH_PRECISION_UNIT} from "../libraries/DataTypes.sol";
 import {LPToken} from "../tokens/LPToken.sol";
@@ -23,6 +24,7 @@ import "hardhat/console.sol";
 contract Vault is IVault, Pausable, Ownable{
     using StorageSlot for bytes32;
     using Math for uint256;
+    using Math2.Math for int256;
     using SafeERC20 for IERC20;
 
     bool private _paused;
@@ -53,7 +55,7 @@ contract Vault is IVault, Pausable, Ownable{
     uint256 public override constant RESERVE_RATIO = GENERAL_UNIT * 10 / 100; // 10%
     uint256 public override constant MAXIMUM_LOCK_RATIO = GENERAL_UNIT * 95 / 100; // 95%
 
-    uint256 public override constant MAXIMUM_CALL_STRIKE_PRICE_RATIO = GENERAL_UNIT * 200 / 100; // 200%
+    uint256 public override constant MAXIMUM_CALL_STRIKE_PRICE_RATIO = GENERAL_UNIT * 210 / 100; // 210%
     uint256 public override constant MINIMUM_CALL_STRIKE_PRICE_RATIO = GENERAL_UNIT * 110 / 100; // 110%
     uint256 public override constant MAXIMUM_PUT_STRIKE_PRICE_RATIO = GENERAL_UNIT * 90 / 100; // 90%
     uint256 public override constant MINIMUM_PUT_STRIKE_PRICE_RATIO = GENERAL_UNIT * 50 / 100; // 50%
@@ -149,6 +151,10 @@ contract Vault is IVault, Pausable, Ownable{
 
     function unrealizedPNL() public override view returns(int256) {
         return _unrealizedPNL;
+    }
+
+    function updateCollectionRisk(address collection, int256 delta, int256 PNL) public override onlyKeeper{
+        IAssetRiskCache(_riskCache).updateAssetRisk(collection, delta, PNL);
     }
 
     //This function is used to update the unrealizedPNL variable in this contract
@@ -261,10 +267,10 @@ contract Vault is IVault, Pausable, Ownable{
         }
     }
 
-    function _calculateStrikeAndPremium(address collection, OptionType optionType, Strike memory strike_) internal view returns(uint256 premium){
+    function _calculateStrikeAndPremium(address collection, OptionType optionType, Strike memory strike_) internal view returns(uint256 premium, int256 delta){
         IPricer pricer = IPricer(_pricer);
         uint256 adjustedVol = pricer.getAdjustedVol(collection, optionType, strike_.strikePrice);
-        premium = pricer.getPremium(optionType, strike_.spotPrice, strike_.strikePrice, adjustedVol, strike_.duration);
+        (premium, delta,,) = pricer.getPremiumDeltaStdVega(optionType, strike_.spotPrice, strike_.strikePrice, adjustedVol, strike_.duration);
     }
 
     function _estimatePremium(address collection, OptionType optionType, uint256 strikePrice, uint256 expiry, uint256 amount) internal view 
@@ -279,7 +285,8 @@ contract Vault is IVault, Pausable, Ownable{
         strike_.expiry = expiry;
         strike_.duration = expiry - block.timestamp;
         _validateOpenOption1(amount, optionType, strike_);
-        premium = _calculateStrikeAndPremium(collection, optionType, strike_).mulDiv(amount, UNIT, Math.Rounding.Up);
+        (premium,) = _calculateStrikeAndPremium(collection, optionType, strike_);
+        premium = premium.mulDiv(amount, UNIT, Math.Rounding.Up);
         _validateOpenOption2(config, strike_.spotPrice.mulDiv(amount, UNIT, Math.Rounding.Up), premium);
         return (premium, strike_);
     }
@@ -324,7 +331,7 @@ contract Vault is IVault, Pausable, Ownable{
         return (positionId, premium);
     }
 
-    function activePosition(address collection, uint256 positionId) public override onlyKeeper onlyUnpaused returns(uint256 premium){
+    function activePosition(address collection, uint256 positionId) public override onlyKeeper onlyUnpaused returns(uint256 premium, int256 delta){
         if(_collections[collection].frozen){
             revert FrozenMarket(address(this), collection);
         }
@@ -343,26 +350,46 @@ contract Vault is IVault, Pausable, Ownable{
         strike_.duration = strike_.expiry - block.timestamp;
         tradeParameters.expiry = strike_.expiry;
         strike_.spotPrice = IOracle(_oracle).getAssetPrice(collection);
-        premium = _calculateStrikeAndPremium(collection, position.optionType, strike_).mulDiv(position.amount, UNIT, Math.Rounding.Up);
+        (premium, delta) = _calculateStrikeAndPremium(collection, position.optionType, strike_);
+        premium = premium.mulDiv(position.amount, UNIT, Math.Rounding.Up);
         if(premium > position.maximumPremium){
             emit FailPosition(optionToken.ownerOf(positionId), collection, positionId, position.maximumPremium);
             _closePendingPosition(collection, positionId);
         }
         else{
             _unrealizedPremium += premium;
+            int256 _collectionDelta = IAssetRiskCache(_riskCache).getAssetDelta(collection);
+            _collectionDelta = _collectionDelta.iMulDiv(int256(optionToken.totalAmount()), UNIT, Math.Rounding.Down);
+            _collectionDelta -= delta.iMulDiv(int256(position.amount), UNIT, Math.Rounding.Down);
             optionToken.activePosition(positionId, premium);
+            _collectionDelta = _collectionDelta.iMulDiv(int256(UNIT), optionToken.totalAmount(), Math.Rounding.Down);
+            IAssetRiskCache(_riskCache).updateAssetDelta(collection, _collectionDelta);
             //transfer premium from the caller to the vault
             uint256 amountToReserve = premium.mulDiv(RESERVE_RATIO, GENERAL_UNIT, Math.Rounding.Up);
             _strikes[position.strikeId] = strike_;
             address payer = position.payer;
             uint256 excessPremium = position.maximumPremium - premium;
-            emit ActivatePosition(optionToken.ownerOf(positionId), collection, positionId, premium, excessPremium);
+            emit ActivatePosition(optionToken.ownerOf(positionId), collection, positionId, premium, excessPremium, delta);
             IERC20(_asset).safeTransfer(_reserve, amountToReserve + KEEPER_FEE);
             IERC20(_asset).safeTransfer(_lpToken, premium - amountToReserve);
             if(excessPremium > 0){
                 IERC20(_asset).safeTransfer(payer, position.maximumPremium - premium);
             }
+            uint256 price = LPToken(_lpToken).convertToAssets(HIGH_PRECISION_UNIT);
+            emit UpdateLPTokenPrice(_lpToken, price);
         }
+    }
+
+    function positionPNLWeightedDelta(address collection, uint256 positionId) public view override returns(int256 unrealizePNL, int256 weightedDelta) {
+        OptionToken optionToken = OptionToken(_collections[collection].optionToken);
+        OptionPosition memory position = optionToken.optionPosition(positionId);
+        Strike memory strike_ = _strikes[position.strikeId];
+        strike_.spotPrice = IOracle(_oracle).getAssetPrice(collection);
+        strike_.duration = strike_.expiry - block.timestamp;
+        uint256 premium;
+        (premium, weightedDelta) = _calculateStrikeAndPremium(collection, position.optionType, strike_);
+        unrealizePNL = int256(premium.mulDiv(position.amount, UNIT, Math.Rounding.Up)) - int256(position.premium);
+        weightedDelta = weightedDelta.iMulDiv(int256(position.amount), UNIT, Math.Rounding.Up);
     }
 
     function closePosition(address collection, uint256 positionId) public override onlyKeeper onlyUnpaused returns(uint256 profit){

@@ -214,8 +214,9 @@ makeSuite('Vault', (testEnv) => {
   });
 
   it("Should be able to open a position on behalf of other user", async () => {
-    const { vault, keeperHelper, eth, lpToken, deployer, markets, users } = testEnv;
-    if(vault === undefined || lpToken === undefined || eth === undefined || deployer === undefined || keeperHelper === undefined || Object.keys(markets).length == 0 || Object.keys(users).length == 0){
+    const { vault, keeperHelper, eth, lpToken, riskCache, deployer, markets, users } = testEnv;
+    if(vault === undefined || lpToken === undefined || eth === undefined || deployer === undefined 
+       || riskCache === undefined || keeperHelper === undefined || Object.keys(markets).length == 0 || Object.keys(users).length == 0){
       throw new Error('testEnv not initialized');
     }
     const market = markets['BAYC'];
@@ -224,6 +225,7 @@ makeSuite('Vault', (testEnv) => {
     const expiry = await time.latest() + 28 * 3600 * 24;
     const strikePrice = bigNumber(12, 19);
     const amount = bigNumber(5, 17);
+    console.log(`delta: ${await riskCache.getAssetDelta(nft)}`);
     const premium = (await vault.estimatePremium(nft, 0, strikePrice, expiry, amount)).mul(105).div(100);
     const receiver = users[0];
     const keeperFee = await vault.KEEPER_FEE();
@@ -240,7 +242,7 @@ makeSuite('Vault', (testEnv) => {
     expect(events).is.not.undefined;
     const openEvent = events?.filter(event => event.topics[0] == vault.interface.getEventTopic('OpenPosition'))[0];
     const estimatedPremium = openEvent.args['parameters']['premium'];
-    expect(estimatedPremium).to.be.equal(BigNumber.from("778208870944333238").mul(amount).add(bigNumber(1,18)).sub(1).div(bigNumber(1, 18)));
+    expect(estimatedPremium).to.be.equal(BigNumber.from("952434244416836000").mul(amount).add(bigNumber(1,18)).sub(1).div(bigNumber(1, 18)));
     const positionIds = await keeperHelper.getPendingOptions(nft);
     let state = await optionToken.optionPositionState(positionIds[0]);
     expect(state).to.be.equal(1); // PENDING
@@ -259,16 +261,12 @@ makeSuite('Vault', (testEnv) => {
     const nft = market.nft;
     const optionToken = market.optionToken;
     const positionIds = await keeperHelper.getActiveOptions(nft);
-    console.log(positionIds);
     let state = await optionToken.optionPositionState(positionIds[0]);
     expect(state).to.be.equal(2); // PENDING
     let strikeId = (await optionToken.optionPosition(positionIds[0])).strikeId;
-    console.log(`strikeId: ${strikeId}`);
     let expiry = (await vault.strike(strikeId)).expiry;
-    console.log(`${positionIds[0]} expired at ${expiry}`);
     await time.increaseTo(expiry);
     const expiredPositions = await keeperHelper.getExpiredOptions(nft);
-    console.log(expiredPositions);
     await keeperHelper.batchCloseOptions(nft, expiredPositions);
   });
 
@@ -283,17 +281,14 @@ makeSuite('Vault', (testEnv) => {
     const nft = market.nft;
     const optionToken = market.optionToken;
     const positionIds = await keeperHelper.getActiveOptions(nft);
-    console.log(positionIds);
     let state = await optionToken.optionPositionState(positionIds[0]);
     expect(state).to.be.equal(2); // PENDING
     const positionData = await optionToken.optionPosition(positionIds[0]);
     const strikeId = positionData.strikeId;
-    console.log(`strikeId: ${strikeId}`);
     const strike = await vault.strike(strikeId);
     const amount = positionData.amount;
     let expiry = strike.expiry;
     const strikePrice = strike.strikePrice;
-    console.log(`${positionIds[0]} expired at ${expiry} with strike price ${strikePrice}`);
     const profitPrice = strikePrice.mul(105).div(100);
     const feeRatio = await vault.feeRatio();
     const profitFeeRatio = await vault.profitFeeRatio();
@@ -308,7 +303,6 @@ makeSuite('Vault', (testEnv) => {
     const [outerIndex, innerIndex] = await oracle.getIndexes(nft);
     await waitTx(await oracle.connect(users[1].signer).batchSetAssetPrice([outerIndex], [[{index: innerIndex, price: profitPrice.div(bigNumber(1, 18-2)), vol: bigNumber(5, 2)}]]));
     const expiredPositions = await keeperHelper.getExpiredOptions(nft);
-    console.log(expiredPositions);
     await keeperHelper.batchCloseOptions(nft, expiredPositions);
     const balanceAfter = await eth.balanceOf(owner.address);
     expect(balanceAfter.sub(balanceBefore)).to.be.equal(profit);

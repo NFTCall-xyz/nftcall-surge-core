@@ -46,7 +46,7 @@ interface IVault {
     }
 
     event OpenPosition(address caller, address indexed receiver, address indexed collection, uint256 indexed positionId, OpenPositionEventParameters parameters);
-    event ActivatePosition(address indexed owner, address indexed collection, uint256 indexed positionId, uint256 premium, uint256 excessPremium);
+    event ActivatePosition(address indexed owner, address indexed collection, uint256 indexed positionId, uint256 premium, uint256 excessPremium, int256 delta);
     event ExercisePosition(address indexed owner, address indexed collection, uint256 indexed positionId, uint256 revenue, uint256 exerciseFee);
     event ExpirePosition(address indexed owner, address indexed collection, uint256 indexed positionId);
     event CancelPosition(address indexed owner, address indexed collection, uint256 indexed positionId, uint256 returnedPremium);
@@ -68,6 +68,7 @@ interface IVault {
     function backstopPool() external view returns(address);
     function unrealizedPNL() external view returns(int256);
     function updateUnrealizedPNL() external returns(int256);
+    function updateCollectionRisk(address collection, int256 delta, int256 PNL) external;
     function unrealizedPremium() external view returns(uint256);
     function deposit(uint256 amount, address onBehalfOf) external;
     function withdraw(uint256 amount, address to) external returns(uint256);
@@ -75,7 +76,8 @@ interface IVault {
     function totalLockedAssets() external view returns(uint256);
     function estimatePremium(address collection, OptionType optionType, uint256 strikePrice, uint256 expiry, uint256 amount) external view returns(uint256 premium);
     function openPosition(address collection, address onBehalfOf, OptionType optionType, uint256 strikePrice, uint256 expiry, uint256 amount, uint256 maximumPremium) external returns(uint256 positionId, uint256 premium);
-    function activePosition(address collection, uint256 positionId) external returns(uint256 premium);
+    function activePosition(address collection, uint256 positionId) external returns(uint256 premium, int256 delta);
+    function positionPNLWeightedDelta(address collection, uint256 positionId) external view returns(int256 unrealizePNL, int256 weightedDelta);
     function closePosition(address collection, uint256 positionId) external returns(uint256);
     function forceClosePendingPosition(address collection, uint256 positionId) external;
     function strike(uint256 strikeId) external view returns(Strike memory);
