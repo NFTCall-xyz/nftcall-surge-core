@@ -26,6 +26,8 @@ contract OptionToken is IOptionToken, ERC721Enumerable, Ownable, SimpleInitializ
     string private _baseTokenURI;
 
     mapping(uint256 => OptionPosition) internal _options;
+    mapping(OptionType => uint256) private _totalAmounts;
+    mapping(OptionType => uint256) private _totalValues;
 
     modifier onlyVault() {
         if (msg.sender != _vault) {
@@ -79,13 +81,16 @@ contract OptionToken is IOptionToken, ERC721Enumerable, Ownable, SimpleInitializ
 
     function activePosition(uint256 positionId, uint256 premium) public override onlyVault
     {
-        OptionPosition storage po = _options[positionId];
+        OptionPosition memory po = _options[positionId];
         if(po.state != PositionState.PENDING) {
             revert IsNotPending(address(this), positionId, po.state);
         }
         po.state = PositionState.ACTIVE;
         po.premium = premium;
         _totalAmount += po.amount;
+        _totalAmounts[po.optionType] += po.amount;
+        _totalValues[po.optionType] += lockedValue(positionId);
+        _options[positionId] = po;
         emit ActivePosition(positionId, premium);
     }
 
@@ -94,7 +99,10 @@ contract OptionToken is IOptionToken, ERC721Enumerable, Ownable, SimpleInitializ
         if(_options[positionId].state != PositionState.ACTIVE) {
             revert IsNotActive(address(this), positionId, _options[positionId].state);
         }
-        _totalAmount -= _options[positionId].amount;
+        OptionPosition memory po = _options[positionId];
+        _totalAmount -= po.amount;
+        _totalAmounts[po.optionType] -= po.amount;
+        _totalValues[po.optionType] -= lockedValue(positionId);        
         _closePosition(positionId);
         emit ClosePosition(positionId);
     }
@@ -118,9 +126,17 @@ contract OptionToken is IOptionToken, ERC721Enumerable, Ownable, SimpleInitializ
         return _totalAmount;
     }
 
+    function totalAmount(OptionType optionType) public override view returns(uint256) {
+        return _totalAmounts[optionType];
+    }
+
     function totalValue() public override view returns(uint256) 
     {
         return(_totalValue);
+    }
+
+    function totalValue(OptionType optionType) public override view returns(uint256) {
+        return _totalValues[optionType];
     }
 
     function lockedValue(uint256 positionId) public view override returns(uint256) {
