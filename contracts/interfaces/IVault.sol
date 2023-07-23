@@ -38,7 +38,19 @@ interface IVault {
     event DefreezeMarket(address indexed operator, address indexed collection);
     event ActivateMarket(address indexed operator, address indexed collection);
     event DeactivateMarket(address indexed operator, address indexed collection);
+    event ReceivePremiumAndFee(address indexed user, uint256 premium, uint256 fee);
+    event ReturnExcessPremium(address indexed user, uint256 returnedPremium);
 
+    function KEEPER_FEE() external view returns(uint256);
+    function RESERVE_RATIO() external view returns(uint256);
+    function MAXIMUM_LOCK_RATIO() external view returns(uint256);
+    function MAXIMUM_CALL_STRIKE_PRICE_RATIO() external view returns(uint256);
+    function MAXIMUM_PUT_STRIKE_PRICE_RATIO() external view returns(uint256);
+    function MINIMUM_CALL_STRIKE_PRICE_RATIO() external view returns(uint256);
+    function MINIMUM_PUT_STRIKE_PRICE_RATIO() external view returns(uint256);
+    function MAXIMUM_DURATION() external view returns(uint256);
+    function MINIMUM_DURATION() external view returns(uint256);
+    
     function keeper() external view returns(address);
     function setKeeper(address keeperAddress) external;
     function reserve() external view returns(address);

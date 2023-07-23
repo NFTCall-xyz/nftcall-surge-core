@@ -44,21 +44,23 @@ contract Vault is IVault, Pausable, Ownable{
     uint256 private _unrealizedPremium;
     int256 private _unrealizedPNL;
 
-    uint256 public constant RESERVE_RATIO = GENERAL_UNIT * 10 / 100; // 10%
+    
     uint256 private FEE_RATIO =  GENERAL_UNIT * 5 / 1000; // 0.5%
     uint256 private PROFIT_FEE_RATIO = GENERAL_UNIT * 125 / 1000; // 12.5%
         
-    uint256 public constant MAXIMUM_LOCK_RATIO = GENERAL_UNIT * 95 / 100; // 95%
     uint256 private constant _decimals = DECIMALS;
 
-    uint256 public constant MAXIMUM_CALL_STRIKE_PRICE_RATIO = GENERAL_UNIT * 200 / 100; // 200%
-    uint256 public constant MINIMUM_CALL_STRIKE_PRICE_RATIO = GENERAL_UNIT * 110 / 100; // 110%
-    uint256 public constant MAXIMUM_PUT_STRIKE_PRICE_RATIO = GENERAL_UNIT * 90 / 100; // 90%
-    uint256 public constant MINIMUM_PUT_STRIKE_PRICE_RATIO = GENERAL_UNIT * 50 / 100; // 50%
-    uint256 public constant KEEPER_FEE = 5 * 10**13; // 0.00005 ETH
+    uint256 public override constant RESERVE_RATIO = GENERAL_UNIT * 10 / 100; // 10%
+    uint256 public override constant MAXIMUM_LOCK_RATIO = GENERAL_UNIT * 95 / 100; // 95%
 
-    uint256 public constant MINIMUM_DURATION = 3 days;
-    uint256 public constant MAXIMUM_DURATION = 30 days;
+    uint256 public override constant MAXIMUM_CALL_STRIKE_PRICE_RATIO = GENERAL_UNIT * 200 / 100; // 200%
+    uint256 public override constant MINIMUM_CALL_STRIKE_PRICE_RATIO = GENERAL_UNIT * 110 / 100; // 110%
+    uint256 public override constant MAXIMUM_PUT_STRIKE_PRICE_RATIO = GENERAL_UNIT * 90 / 100; // 90%
+    uint256 public override constant MINIMUM_PUT_STRIKE_PRICE_RATIO = GENERAL_UNIT * 50 / 100; // 50%
+    uint256 public override constant KEEPER_FEE = 5 * 10**13; // 0.00005 ETH
+
+    uint256 public override constant MINIMUM_DURATION = 3 days;
+    uint256 public override constant MAXIMUM_DURATION = 30 days;
 
     constructor (address asset, address lpToken, address oracle, address pricer, address riskCache, address reserve_, address backstopPool_)
         Ownable()
@@ -277,7 +279,7 @@ contract Vault is IVault, Pausable, Ownable{
         strike_.expiry = expiry;
         strike_.duration = expiry - block.timestamp;
         _validateOpenOption1(amount, optionType, strike_);
-        uint256 premium = _calculateStrikeAndPremium(collection, optionType, strike_).mulDiv(amount, UNIT, Math.Rounding.Up);
+        premium = _calculateStrikeAndPremium(collection, optionType, strike_).mulDiv(amount, UNIT, Math.Rounding.Up);
         _validateOpenOption2(config, strike_.spotPrice.mulDiv(amount, UNIT, Math.Rounding.Up), premium);
         return (premium, strike_);
     }
@@ -310,6 +312,8 @@ contract Vault is IVault, Pausable, Ownable{
         positionId = optionToken.openPosition(_msgSender(), onBehalfOf, optionType, strikeId, amount, maximumPremium);
         _totalLockedAssets += optionToken.lockedValue(positionId);
         emit OpenPosition(collection, strikeId, positionId, premium);
+        emit ReceivePremiumAndFee(_msgSender(), maximumPremium, KEEPER_FEE);
+        IERC20(_asset).safeTransferFrom(_msgSender(), address(this), maximumPremium + KEEPER_FEE);
         return (positionId, premium);
     }
 
@@ -334,18 +338,22 @@ contract Vault is IVault, Pausable, Ownable{
         strike_.spotPrice = IOracle(_oracle).getAssetPrice(collection);
         premium = _calculateStrikeAndPremium(collection, position.optionType, strike_).mulDiv(position.amount, UNIT, Math.Rounding.Up);
         if(premium > position.maximumPremium){
-            revert PremiumTooHigh(address(this), positionId, premium, position.maximumPremium);
+            _closePendingPosition(collection, positionId);
         }
-        _unrealizedPremium += premium;
-        optionToken.activePosition(positionId, premium);
-        //transfer premium from the caller to the vault
-        uint256 amountToReserve = premium.mulDiv(RESERVE_RATIO, GENERAL_UNIT, Math.Rounding.Up);
-        _strikes[position.strikeId] = strike_;
-        address payer = position.payer;
-        emit ReceivePremium(payer, amountToReserve, premium - amountToReserve);
-        emit ReceiveKeeperFee(payer, KEEPER_FEE);
-        IERC20(_asset).safeTransferFrom(payer, _reserve, amountToReserve + KEEPER_FEE);
-        IERC20(_asset).safeTransferFrom(payer, _lpToken, premium - amountToReserve);
+        else{
+            _unrealizedPremium += premium;
+            optionToken.activePosition(positionId, premium);
+            //transfer premium from the caller to the vault
+            uint256 amountToReserve = premium.mulDiv(RESERVE_RATIO, GENERAL_UNIT, Math.Rounding.Up);
+            _strikes[position.strikeId] = strike_;
+            address payer = position.payer;
+            emit ReceivePremium(payer, amountToReserve, premium - amountToReserve);
+            emit ReceiveKeeperFee(payer, KEEPER_FEE);
+            emit ReturnExcessPremium(payer, position.maximumPremium - premium);
+            IERC20(_asset).safeTransfer(_reserve, amountToReserve + KEEPER_FEE);
+            IERC20(_asset).safeTransfer(_lpToken, premium - amountToReserve);
+            IERC20(_asset).safeTransfer(payer, position.maximumPremium - premium);
+        }
     }
 
     function closePosition(address collection, uint256 positionId) public override onlyKeeper onlyUnpaused returns(uint256 profit){
@@ -400,16 +408,25 @@ contract Vault is IVault, Pausable, Ownable{
         return profit;
     }
 
-    function forceClosePendingPosition(address collection, uint256 positionId) public override onlyUnpaused onlyKeeper {
+    function _closePendingPosition(address collection, uint256 positionId) internal {
+        OptionToken optionToken = OptionToken(_collections[collection].optionToken);
+        _totalLockedAssets -= optionToken.lockedValue(positionId);
+        OptionPosition memory position = optionToken.optionPosition(positionId);
+        uint256 strikeId = position.strikeId;
+        delete _strikes[strikeId];
+        emit DestoryStrike(strikeId);
+        address payer = position.payer;
+        uint256 premium = position.maximumPremium;
+        optionToken.forceClosePendingPosition(positionId);
+        emit ReturnExcessPremium(payer, premium);
+        IERC20(_asset).safeTransferFrom(address(this), payer, premium);
+    }
+
+    function forceClosePendingPosition(address collection, uint256 positionId) public override onlyUnpaused {
         if(_collections[collection].frozen){
             revert FrozenMarket(address(this), collection);
         }
-        OptionToken optionToken = OptionToken(_collections[collection].optionToken);
-        _totalLockedAssets -= optionToken.lockedValue(positionId);
-        uint256 strikeId = optionToken.optionPosition(positionId).strikeId;
-        delete _strikes[strikeId];
-        emit DestoryStrike(strikeId);
-        optionToken.forceClosePendingPosition(positionId);
+        _closePendingPosition(collection, positionId);
     }
 
     function _calculateExerciseProfit(OptionType optionType, uint256 currentPrice, uint256 strikePrice, uint256 amount) internal view returns(uint256, uint256){
