@@ -134,5 +134,13 @@
     "arbitrumGoerli": {
       "address": "0xDd98cF6f5B6aE19fE9aa4735461742976ca06861"
     }
+  },
+  "SurgeUI": {
+    "localhost": {
+      "address": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
+    },
+    "arbitrumGoerli": {
+      "address": "0xBf0284A6e2De3a46cdb5cF19B9c7895e92fc00cA"
+    }
   }
 }
