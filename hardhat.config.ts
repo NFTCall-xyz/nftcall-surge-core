@@ -25,6 +25,7 @@ const config: HardhatUserConfig = {
   typechain: {
     outDir: "types",
     target: "ethers-v5",
+    discriminateTypes: true,
   },
   solidity: {
     version: "0.8.17",
