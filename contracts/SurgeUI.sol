@@ -177,6 +177,7 @@ contract SurgeUI {
             vault_.lpToken.maxWithdraw = lpTokenInstance.maxWithdraw(
                 userAddress
             );
+            vault_.lpToken.maxRedeem = lpTokenInstance.maxRedeem(userAddress);
             vault_.lpToken.releaseTime = lpTokenInstance.releaseTime(
                 userAddress
             );
