@@ -81,13 +81,13 @@ contract OptionPricer is IPricer, Ownable, SimpleInitializable {
     int adjustedVol = int(vol);
     if (ot == OptionType.LONG_CALL) {
       if (K <= S) {
-        revert IllegalStrikePrice(msg.sender, S, K);
+        revert IllegalStrikePrice(_msgSender(), S, K);
       }
       adjustedVol += int(vol*(K-S)*pricerParams.skewP1/S/(GENERAL_UNIT) + vol*(K-S)*(K-S)*pricerParams.skewP2/S/S/(GENERAL_UNIT));
       adjustedVol -= adjustedVol * delta_ * int(delta_ <= 0 ? pricerParams.deltaP1 : pricerParams.deltaP2) * int(collectionLockedValue + lockValue) / int(UNIT) / int(vaultTotalAssets) / int(uint(collectionConfig.weight));
     } else {
       if (K >= S) {
-        revert IllegalStrikePrice(msg.sender, S, K);
+        revert IllegalStrikePrice(_msgSender(), S, K);
       }
       uint rK = S * S / K;
       adjustedVol += int(vol*(rK-S)*pricerParams.skewP1/S/(GENERAL_UNIT) + vol*(rK-S)*(rK-S)*pricerParams.skewP2/S/S/(GENERAL_UNIT));

@@ -30,8 +30,8 @@ contract OptionToken is IOptionToken, ERC721Enumerable, Ownable, SimpleInitializ
     mapping(OptionType => uint256) private _totalValues;
 
     modifier onlyVault() {
-        if (msg.sender != _vault) {
-            revert OnlyVault(address(this), msg.sender, _vault);
+        if (_msgSender() != _vault) {
+            revert OnlyVault(address(this), _msgSender(), _vault);
         }
         _;
     }

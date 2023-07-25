@@ -36,8 +36,8 @@ contract LPToken is ILPToken, ERC4626, Ownable, SimpleInitializable {
     }
 
     modifier onlyVault() {
-        if (msg.sender != _vault) {
-            revert OnlyVault(address(this), msg.sender, _vault);
+        if (_msgSender() != _vault) {
+            revert OnlyVault(address(this), _msgSender(), _vault);
         }
         _;
     }

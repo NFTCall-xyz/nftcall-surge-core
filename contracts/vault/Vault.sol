@@ -36,7 +36,8 @@ contract Vault is IVault, Pausable, Ownable{
     address private _reserve;
     address private _backstopPool;
     address private _keeper;
-    uint256 private _nextId = 1;    mapping(address => CollectionConfiguration) private _collections;
+    uint256 private _nextId = 1;
+    mapping(address => CollectionConfiguration) private _collections;
     mapping(uint256 => address) private _collectionsList;
     mapping(uint256 => Strike) private _strikes;
 
@@ -79,15 +80,15 @@ contract Vault is IVault, Pausable, Ownable{
     }
 
     modifier onlyKeeper() {
-        if (msg.sender != _keeper) {
-            revert OnlyKeeper(address(this), msg.sender, _keeper);
+        if (_msgSender() != _keeper) {
+            revert OnlyKeeper(address(this), _msgSender(), _keeper);
         }
         _;
     }
 
     modifier onlyUnpaused() {
         if (_paused) {
-            revert OnlyUnpaused(address(this), msg.sender);
+            revert OnlyUnpaused(address(this), _msgSender());
         }
         _;
     }
@@ -110,12 +111,12 @@ contract Vault is IVault, Pausable, Ownable{
 
     function pause() public override onlyOwner {
         _paused = true;
-        emit Paused(msg.sender);
+        emit Paused(_msgSender());
     }
 
     function unpause() public override onlyOwner {
         _paused = false;
-        emit Unpaused(msg.sender);
+        emit Unpaused(_msgSender());
     }
 
     function isPaused() public override view returns(bool) {
@@ -124,12 +125,12 @@ contract Vault is IVault, Pausable, Ownable{
 
     function activateMarket(address collection) public override onlyOwner {
         _collections[collection].activated = true;
-        emit ActivateMarket(msg.sender, collection);
+        emit ActivateMarket(_msgSender(), collection);
     }
 
     function deactivateMarket(address collection) public override onlyOwner {
         _collections[collection].activated = false;
-        emit DeactivateMarket(msg.sender, collection);
+        emit DeactivateMarket(_msgSender(), collection);
     }
 
     function isActiveMarket(address collection) public override view returns(bool) {
@@ -138,12 +139,12 @@ contract Vault is IVault, Pausable, Ownable{
 
     function freezeMarket(address collection) public override onlyOwner {
         _collections[collection].frozen = true;
-        emit FreezeMarket(msg.sender, collection);
+        emit FreezeMarket(_msgSender(), collection);
     }
 
     function defreezeMarket(address collection) public override onlyOwner {
         _collections[collection].frozen = false;
-        emit DefreezeMarket(msg.sender, collection);
+        emit DefreezeMarket(_msgSender(), collection);
     }
 
     function isFrozenMarket(address collection) public override view returns(bool) {
@@ -189,15 +190,15 @@ contract Vault is IVault, Pausable, Ownable{
     }
 
     function deposit(uint256 amount, address onBehalfOf) public override onlyUnpaused{
-        LPToken(_lpToken).deposit(amount, msg.sender, onBehalfOf);
+        LPToken(_lpToken).deposit(amount, _msgSender(), onBehalfOf);
     }
 
     function withdraw(uint256 amount, address to) public override onlyUnpaused returns(uint256){
-        return LPToken(_lpToken).withdraw(amount, to, msg.sender);
+        return LPToken(_lpToken).withdraw(amount, to, _msgSender());
     }
 
     function redeem(uint256 amount, address to) public override onlyUnpaused returns(uint256){
-        return LPToken(_lpToken).redeem(amount, to, msg.sender);
+        return LPToken(_lpToken).redeem(amount, to, _msgSender());
     }
 
     function totalAssets() public view override returns(uint256) {
