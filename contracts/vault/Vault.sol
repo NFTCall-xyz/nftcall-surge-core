@@ -559,4 +559,8 @@ contract Vault is IVault, Pausable, Ownable{
     function marketConfiguration(address collection) public view returns(CollectionConfiguration memory) {
         return _collections[collection];
     }
+
+    function collectUntitledAssetsFromLPToken(address receiver) public onlyOwner returns(uint256 amount) {
+        amount = LPToken(_lpToken).collectUntitledAssets(receiver);
+    }
 }

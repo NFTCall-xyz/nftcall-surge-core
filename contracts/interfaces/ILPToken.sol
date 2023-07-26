@@ -17,7 +17,7 @@ interface ILPToken {
     function setMinimumAssetToShareRatio(uint256 ratio) external;
     function deposit(uint256 assets, address user, address receiver) external returns(uint256);
     function untitledAssets() external view returns(uint256);
-    function collect(address receiver) external returns(uint256);
+    function collectUntitledAssets(address receiver) external returns(uint256);
     function increaseTotalAssets(uint256 amount) external;
     function decreaseTotalAssets(uint256 amount) external;
 

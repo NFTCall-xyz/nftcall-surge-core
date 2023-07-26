@@ -99,6 +99,7 @@ interface IVault {
     function isActiveMarket(address collection) external view returns(bool);
     function feeRatio() external view returns(uint256);
     function profitFeeRatio() external view returns(uint256);
+    function collectUntitledAssetsFromLPToken(address receiver) external returns(uint256);
 
     error ZeroAmount(address thrower);
     error InvalidStrikePrice(address thrower, uint strikePrice, uint entryPrice);
