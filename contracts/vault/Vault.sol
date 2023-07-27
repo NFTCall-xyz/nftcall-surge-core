@@ -46,12 +46,15 @@ contract Vault is IVault, Pausable, Ownable{
     int256 private _realizedPNL;
     uint256 private _unrealizedPremium;
     int256 private _unrealizedPNL;
+    uint256 private _minimumAnnualRateOfReturnOnLockedAssets;
 
     
     uint256 private FEE_RATIO =  GENERAL_UNIT * 5 / 1000; // 0.5%
     uint256 private PROFIT_FEE_RATIO = GENERAL_UNIT * 125 / 1000; // 12.5%
         
     uint256 private constant _decimals = DECIMALS;
+    uint256 private constant _SECONDS_PRE_YEAR = 365 * 24 * 3600;
+    
 
     uint256 public override constant RESERVE_RATIO = GENERAL_UNIT * 10 / 100; // 10%
     uint256 public override constant MAXIMUM_LOCK_RATIO = GENERAL_UNIT * 95 / 100; // 95%
@@ -76,6 +79,7 @@ contract Vault is IVault, Pausable, Ownable{
         _riskCache = riskCache;
         _reserve = reserve_;
         _backstopPool = backstopPool_;
+        _minimumAnnualRateOfReturnOnLockedAssets = UNIT * 5 / 100; // 5%
         _keeper = owner();
     }
 
@@ -181,6 +185,15 @@ contract Vault is IVault, Pausable, Ownable{
         return _unrealizedPremium;
     }
 
+    function minimumAnnualRateOfReturnOnLockedAssets() public override view returns(uint256) {
+        return _minimumAnnualRateOfReturnOnLockedAssets;
+    }
+
+    function setMinimumAnnualRateOfReturnOnLockedAssets(uint256 ratio) public override onlyOwner {
+        _minimumAnnualRateOfReturnOnLockedAssets = ratio;
+        emit UpdateMinimumAnnualRateOfReturnOnLockedAssets(_msgSender(), ratio);
+    }
+
     function feeRatio() public override view returns(uint256) {
         return FEE_RATIO;
     }
@@ -207,6 +220,17 @@ contract Vault is IVault, Pausable, Ownable{
 
     function totalLockedAssets() public view override returns(uint256) {
         return _totalLockedAssets;
+    }
+
+    function _assetReturn(uint256 amount, uint256 duration, uint256 annualRate) internal pure returns(uint256) {
+        return amount.mulDiv(annualRate, UNIT, Math.Rounding.Up).mulDiv(duration, _SECONDS_PRE_YEAR, Math.Rounding.Up);
+    }
+
+    function minimumPremium(OptionType optionType, uint256 strikePrice, uint256 expiry, uint256 amount) public view override returns(uint256) {
+        uint256 entryPrice = IOracle(_oracle).getAssetPrice(_asset);
+        uint256 duration = expiry - block.timestamp;
+        uint256 lockedValue = _lockedValue(optionType, entryPrice, strikePrice, amount);
+        return _assetReturn(lockedValue, duration, _minimumAnnualRateOfReturnOnLockedAssets);
     }
 
     function _validateOpenOption1(uint256 amount, OptionType optionType, Strike memory strike_) internal view{
@@ -249,6 +273,15 @@ contract Vault is IVault, Pausable, Ownable{
         }
     }
 
+    function _lockedValue(OptionType optionType, uint256 entryPrice, uint256 strikePrice, uint256 amount) internal pure returns(uint256 lockedValue) {
+        if(optionType == OptionType.LONG_CALL){
+            lockedValue = entryPrice.mulDiv(amount, UNIT, Math.Rounding.Up);
+        }
+        else {
+            lockedValue = strikePrice.mulDiv(amount, UNIT, Math.Rounding.Up);
+        }
+    }
+
     function maximumOptionAmount(address collection, OptionType optionType) external view override returns(uint256 amount) {
         CollectionConfiguration memory config = _collections[collection];
         uint256 currentAmount = LPToken(_lpToken).totalAssets();
@@ -275,13 +308,7 @@ contract Vault is IVault, Pausable, Ownable{
 
     function _adjustedPremium(address collection, OptionType optionType, Strike memory strike_, uint256 amount) internal view returns(uint256 premium){
         IPricer pricer = IPricer(_pricer);
-        uint256 lockedValue;
-        if(optionType == OptionType.LONG_CALL){
-            lockedValue = strike_.entryPrice.mulDiv(amount, UNIT, Math.Rounding.Up);
-        }
-        else {
-            lockedValue = strike_.strikePrice.mulDiv(amount, UNIT, Math.Rounding.Up);
-        }
+        uint256 lockedValue = _lockedValue(optionType, strike_.entryPrice, strike_.strikePrice, amount);
         uint256 adjustedVol = pricer.getAdjustedVol(collection, optionType, strike_.strikePrice, lockedValue);
         (uint256 call, uint256 put) = pricer.optionPrices(strike_.entryPrice, strike_.strikePrice, adjustedVol, strike_.duration);
         if(optionType == OptionType.LONG_CALL){
@@ -325,20 +352,19 @@ contract Vault is IVault, Pausable, Ownable{
     function estimatePremium(address collection, OptionType optionType, uint256 strikePrice, uint256 expiry, uint256 amount) public view override 
         returns(uint256 premium)
     {
-        (premium, ) = _estimatePremium(collection, optionType, strikePrice, expiry, amount);
-        return premium;
+        Strike memory strike_;
+        (premium, strike_) = _estimatePremium(collection, optionType, strikePrice, expiry, amount);
+        uint256 minimumPremium_ = _assetReturn(
+            _lockedValue(optionType, strike_.entryPrice, strike_.strikePrice, amount),
+            strike_.duration, 
+            _minimumAnnualRateOfReturnOnLockedAssets);
+        return Math.max(premium, minimumPremium_);
     }
 
     function adjustedVolatility(address collection, OptionType optionType, uint256 strikePrice, uint256 amount) public view override returns(uint256 adjustedVol){
         IPricer pricer = IPricer(_pricer);
-        uint256 lockedValue;
         uint256 entryPrice = IOracle(_oracle).getAssetPrice(collection);
-        if(optionType == OptionType.LONG_CALL){
-            lockedValue = entryPrice.mulDiv(amount, UNIT, Math.Rounding.Up);
-        }
-        else {
-            lockedValue = strikePrice.mulDiv(amount, UNIT, Math.Rounding.Up);
-        }
+        uint256 lockedValue = _lockedValue(optionType, entryPrice, strikePrice, amount);
         return pricer.getAdjustedVol(collection, optionType, strikePrice, lockedValue);
     }
 
@@ -358,10 +384,14 @@ contract Vault is IVault, Pausable, Ownable{
         uint256 strikeId = _nextId++;
         _strikes[strikeId] = strike_;
         emit CreateStrike(strikeId, strike_.duration, strike_.expiry, strike_.entryPrice, strike_.strikePrice);
+        uint256 lockedValue = _lockedValue(optionType, strike_.entryPrice, strike_.strikePrice, amount);
+        uint256 minimumPremium_ = _assetReturn(lockedValue, strike_.duration, _minimumAnnualRateOfReturnOnLockedAssets);
+        premium = Math.max(premium, minimumPremium_);
+
         //mint option token
         OptionToken optionToken = OptionToken( _collections[collection].optionToken);
         positionId = optionToken.openPosition(_msgSender(), onBehalfOf, optionType, strikeId, amount, maximumPremium);
-        _totalLockedAssets += optionToken.lockedValue(positionId);
+        _totalLockedAssets += lockedValue;
         OpenPositionEventParameters memory eventParameters;
         eventParameters.expiration = strike_.expiry;
         eventParameters.entryPrice = strike_.entryPrice;
@@ -394,6 +424,11 @@ contract Vault is IVault, Pausable, Ownable{
             _closePendingPosition(collection, positionId);
         }
         else{
+            uint256 minimumPremium_ = _assetReturn(
+                _lockedValue(position.optionType, strike_.entryPrice, strike_.strikePrice, position.amount),
+                strike_.duration, 
+                _minimumAnnualRateOfReturnOnLockedAssets);
+            premium = Math.max(premium, minimumPremium_);
             _unrealizedPremium += premium;
             uint256 unadjustedPremium;
             (unadjustedPremium, delta) = _premiumAndDelta(collection, position.optionType, strike_.entryPrice, strike_.strikePrice, strike_.duration);
