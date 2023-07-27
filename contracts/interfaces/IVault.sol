@@ -51,6 +51,7 @@ interface IVault {
     event ExpirePosition(address indexed owner, address indexed collection, uint256 indexed positionId, uint256 settlementPrice);
     event CancelPosition(address indexed owner, address indexed collection, uint256 indexed positionId, uint256 returnedPremium);
     event FailPosition(address indexed owner, address indexed collection, uint256 indexed positionId, uint256 returnedPremium);
+    event SendAssetsToLPToken(address indexed operator, uint256 amount);
 
     function KEEPER_FEE() external view returns(uint256);
     function RESERVE_RATIO() external view returns(uint256);
@@ -100,6 +101,7 @@ interface IVault {
     function feeRatio() external view returns(uint256);
     function profitFeeRatio() external view returns(uint256);
     function collectUntitledAssetsFromLPToken(address receiver) external returns(uint256);
+    function sendAssetsToLPToken(uint256 amount) external;
 
     error ZeroAmount(address thrower);
     error InvalidStrikePrice(address thrower, uint strikePrice, uint entryPrice);

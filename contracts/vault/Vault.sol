@@ -563,4 +563,10 @@ contract Vault is IVault, Pausable, Ownable{
     function collectUntitledAssetsFromLPToken(address receiver) public onlyOwner returns(uint256 amount) {
         amount = LPToken(_lpToken).collectUntitledAssets(receiver);
     }
+
+    function sendAssetsToLPToken(uint256 amount) public {
+        IERC20(_asset).safeTransferFrom(_msgSender(), _lpToken, amount);
+        LPToken(_lpToken).increaseTotalAssets(amount);
+        emit SendAssetsToLPToken(_msgSender(), amount);
+    }
 }
