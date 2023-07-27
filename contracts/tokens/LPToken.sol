@@ -220,7 +220,7 @@ contract LPToken is ILPToken, ERC4626, Ownable, SimpleInitializable {
     }
 
     function untitledAssets() public view override returns(uint256) {
-        return IERC20(asset()).balanceOf(address(this)) - totalAssets();
+        return IERC20(asset()).balanceOf(address(this)) - _totalAssets;
     }
 
     function collectUntitledAssets(address receiver) public onlyVault override returns(uint256) {
