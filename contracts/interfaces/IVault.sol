@@ -7,6 +7,11 @@ enum TradeType {
     CLOSE
 }
 
+enum FailureReason {
+    PREMIUM_TOO_HIGH,
+    EXPIRED
+}
+
 struct Strike {
     uint256 entryPrice;
     uint256 strikePrice;
@@ -50,9 +55,10 @@ interface IVault {
     event ExercisePosition(address indexed owner, address indexed collection, uint256 indexed positionId, uint256 revenue, uint256 exerciseFee, uint256 settlementPrice);
     event ExpirePosition(address indexed owner, address indexed collection, uint256 indexed positionId, uint256 settlementPrice);
     event CancelPosition(address indexed owner, address indexed collection, uint256 indexed positionId, uint256 returnedPremium);
-    event FailPosition(address indexed owner, address indexed collection, uint256 indexed positionId, uint256 returnedPremium);
+    event FailPosition(address indexed owner, address indexed collection, uint256 indexed positionId, uint256 returnedPremium, FailureReason reason);
     event SendAssetsToLPToken(address indexed operator, uint256 amount);
     event UpdateMinimumAnnualRateOfReturnOnLockedAssets(address indexed operator, uint256 ratio);
+    event UpdateTimeWindowForActivation(address indexed operator, uint256 timeWindows);
 
     function KEEPER_FEE() external view returns(uint256);
     function RESERVE_RATIO() external view returns(uint256);
@@ -81,6 +87,8 @@ interface IVault {
     function estimatePremium(address collection, OptionType optionType, uint256 strikePrice, uint256 expiry, uint256 amount) external view returns(uint256 premium);
     function minimumAnnualRateOfReturnOnLockedAssets() external view returns(uint256);
     function setMinimumAnnualRateOfReturnOnLockedAssets(uint256 ratio) external;
+    function timeWindowForActivation() external view returns(uint256);
+    function setTimeWindowForActivation(uint256 timeWindows) external;
     function adjustedVolatility(address collection, OptionType optionType, uint256 strikePrice, uint256 amount) external view returns(uint256);
     function openPosition(address collection, address onBehalfOf, OptionType optionType, uint256 strikePrice, uint256 expiry, uint256 amount, uint256 maximumPremium) external returns(uint256 positionId, uint256 premium);
     function activatePosition(address collection, uint256 positionId) external returns(uint256 premium, int256 delta);

@@ -46,7 +46,8 @@ contract Vault is IVault, Pausable, Ownable{
     int256 private _realizedPNL;
     uint256 private _unrealizedPremium;
     int256 private _unrealizedPNL;
-    uint256 private _minimumAnnualRateOfReturnOnLockedAssets;
+    uint256 private _minimumAnnualRateOfReturnOnLockedAssets = UNIT * 5 / 100; // 5%
+    uint256 private _timeWindowForActivation = 1 hours;
 
     
     uint256 private FEE_RATIO =  GENERAL_UNIT * 5 / 1000; // 0.5%
@@ -79,7 +80,6 @@ contract Vault is IVault, Pausable, Ownable{
         _riskCache = riskCache;
         _reserve = reserve_;
         _backstopPool = backstopPool_;
-        _minimumAnnualRateOfReturnOnLockedAssets = UNIT * 5 / 100; // 5%
         _keeper = owner();
     }
 
@@ -192,6 +192,15 @@ contract Vault is IVault, Pausable, Ownable{
     function setMinimumAnnualRateOfReturnOnLockedAssets(uint256 ratio) public override onlyOwner {
         _minimumAnnualRateOfReturnOnLockedAssets = ratio;
         emit UpdateMinimumAnnualRateOfReturnOnLockedAssets(_msgSender(), ratio);
+    }
+
+    function timeWindowForActivation() public override view returns(uint256) {
+        return _timeWindowForActivation;
+    }
+
+    function setTimeWindowForActivation(uint256 timeWindows) public override onlyOwner {
+        _timeWindowForActivation = timeWindows;
+        emit UpdateTimeWindowForActivation(_msgSender(), timeWindows);
     }
 
     function feeRatio() public override view returns(uint256) {
@@ -415,12 +424,17 @@ contract Vault is IVault, Pausable, Ownable{
         OptionToken optionToken = OptionToken(_collections[collection].optionToken);
         OptionPosition memory position = optionToken.optionPosition(positionId);
         Strike memory strike_ = _strikes[position.strikeId];
+        if(block.timestamp + strike_.duration - strike_.expiry > _timeWindowForActivation){
+            emit FailPosition(optionToken.ownerOf(positionId), collection, positionId, position.premium, FailureReason.EXPIRED);
+            _closePendingPosition(collection, positionId);
+            return (0, 0);
+        }
         strike_.duration = strike_.expiry - block.timestamp;
         strike_.entryPrice = IOracle(_oracle).getAssetPrice(collection);
         premium = _adjustedPremium(collection, position.optionType, strike_, position.amount);
         premium = premium.mulDiv(position.amount, UNIT, Math.Rounding.Up);
         if(premium > position.maximumPremium){
-            emit FailPosition(optionToken.ownerOf(positionId), collection, positionId, position.maximumPremium);
+            emit FailPosition(optionToken.ownerOf(positionId), collection, positionId, position.maximumPremium, FailureReason.PREMIUM_TOO_HIGH);
             _closePendingPosition(collection, positionId);
         }
         else{
