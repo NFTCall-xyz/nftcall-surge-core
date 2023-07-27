@@ -239,7 +239,7 @@ contract Vault is IVault, Pausable, Ownable{
 
     function _validateOpenOption2(CollectionConfiguration memory collection, uint256 valueToBeLocked, uint256 premium) internal view
     {
-        uint256 currentAmount = IERC20(_asset).balanceOf(_lpToken) + premium;
+        uint256 currentAmount = LPToken(_lpToken).totalAssets() + premium;
         uint256 totalLockedValue = OptionToken(collection.optionToken).totalValue();
         if(totalLockedValue + valueToBeLocked > _maximumLockedValueOfCollection(collection, currentAmount)){
             revert InsufficientLiquidityForCollection(address(this), OptionToken(collection.optionToken).collection(), totalLockedValue, valueToBeLocked, currentAmount);
@@ -251,7 +251,7 @@ contract Vault is IVault, Pausable, Ownable{
 
     function maximumOptionAmount(address collection, OptionType optionType) external view override returns(uint256 amount) {
         CollectionConfiguration memory config = _collections[collection];
-        uint256 currentAmount = IERC20(_asset).balanceOf(_lpToken);
+        uint256 currentAmount = LPToken(_lpToken).totalAssets();
         uint256 totalLockedValue = OptionToken(config.optionToken).totalValue();
         uint256 maximumLockedValueOfCollection = _maximumLockedValueOfCollection(config, currentAmount);
         if(totalLockedValue >= maximumLockedValueOfCollection){
