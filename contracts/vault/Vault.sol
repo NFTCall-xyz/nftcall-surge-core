@@ -6,7 +6,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {Pausable} from "@openzeppelin/contracts/security/Pausable.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-import "../libraries/Math.sol" as Math2;
+import {LyraMath} from "../libraries/LyraMath.sol";
 import {StorageSlot} from "@openzeppelin/contracts/utils/StorageSlot.sol";
 import {GENERAL_UNIT, DECIMALS, UNIT, HIGH_PRECISION_UNIT} from "../libraries/DataTypes.sol";
 import {LPToken} from "../tokens/LPToken.sol";
@@ -24,7 +24,7 @@ import "hardhat/console.sol";
 contract Vault is IVault, Pausable, Ownable{
     using StorageSlot for bytes32;
     using Math for uint256;
-    using Math2.Math for int256;
+    using LyraMath for int256;
     using SafeERC20 for IERC20;
 
     bool private _paused;

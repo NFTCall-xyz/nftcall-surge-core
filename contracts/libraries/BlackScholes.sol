@@ -5,7 +5,7 @@ pragma solidity 0.8.17;
 import "../synthetix/SignedDecimalMath.sol";
 import "../synthetix/DecimalMath.sol";
 import "./FixedPointMathLib.sol";
-import "./Math.sol";
+import "./LyraMath.sol";
 
 /**
  * @title BlackScholes
@@ -353,7 +353,7 @@ library BlackScholes {
    * borrowed from a C++ implementation https://stackoverflow.com/a/23119456
    */
   function _stdNormalCDF(int x) public pure returns (uint) {
-    uint z = Math.abs(x);
+    uint z = LyraMath.abs(x);
     int c = 0;
 
     if (z <= 37 * PRECISE_UNIT) {
