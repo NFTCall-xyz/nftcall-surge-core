@@ -19,11 +19,12 @@ contract OptionToken is IOptionToken, ERC721Enumerable, Ownable, SimpleInitializ
 
     address public immutable collection;
     address private _vault;
-    uint256 internal constant _decimals = DECIMALS;
     uint256 private _totalValue;
     uint256 private _totalAmount;
     uint256 private _nextId = 1;
     string private _baseTokenURI;
+
+    uint8 internal constant _decimals = uint8(DECIMALS);
 
     mapping(uint256 => OptionPosition) internal _options;
     mapping(OptionType => uint256) private _totalAmounts;
@@ -41,6 +42,10 @@ contract OptionToken is IOptionToken, ERC721Enumerable, Ownable, SimpleInitializ
     {
         collection = collectionAddress;
         _baseTokenURI = baseURI;
+    }
+
+    function decimals() public view override returns(uint8) {
+        return _decimals;
     }
 
     function initialize(address vaultAddress) public onlyOwner initializer {

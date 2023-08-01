@@ -52,8 +52,8 @@ contract Vault is IVault, Pausable, Ownable{
     
     uint256 private FEE_RATIO =  GENERAL_UNIT * 5 / 1000; // 0.5%
     uint256 private PROFIT_FEE_RATIO = GENERAL_UNIT * 125 / 1000; // 12.5%
-        
-    uint256 private constant _decimals = DECIMALS;
+
+    uint8 private constant _decimals = uint8(DECIMALS);
     uint256 private constant _SECONDS_PRE_YEAR = 365 * 24 * 3600;
     
 
@@ -73,6 +73,28 @@ contract Vault is IVault, Pausable, Ownable{
     constructor (address asset, address lpToken, address oracle, address pricer, address riskCache, address reserve_, address backstopPool_)
         Ownable()
     {
+        if(asset == address(0)){
+            revert ZeroAddress(_msgSender());
+        }
+        if(lpToken == address(0)){
+            revert ZeroAddress(_msgSender());
+        }
+        if(oracle == address(0)){
+            revert ZeroAddress(_msgSender());
+        }
+        if(pricer == address(0)){
+            revert ZeroAddress(_msgSender());
+        }
+        if(riskCache == address(0)){
+            revert ZeroAddress(_msgSender());
+        }
+        if(reserve_ == address(0)){
+            revert ZeroAddress(_msgSender());
+        }
+        if(backstopPool_ == address(0)){
+            revert ZeroAddress(_msgSender());
+        }
+
         _asset = asset;
         _lpToken = lpToken;
         _oracle = oracle;
@@ -97,12 +119,20 @@ contract Vault is IVault, Pausable, Ownable{
         _;
     }
 
+    function decimals() public override view returns(uint8) {
+        return _decimals;
+    }
+
     function keeper() public override view returns(address) {
         return _keeper;
     }
 
     function setKeeper(address keeperAddress) public override onlyOwner {
+        if(keeperAddress == address(0)){
+            revert ZeroAddress(address(this));
+        }
         _keeper = keeperAddress;
+        emit UpdateKeeper(_msgSender(), keeperAddress);
     }
 
     function reserve() public override view returns(address) {
@@ -399,17 +429,18 @@ contract Vault is IVault, Pausable, Ownable{
 
         //mint option token
         OptionToken optionToken = OptionToken( _collections[collection].optionToken);
-        positionId = optionToken.openPosition(_msgSender(), onBehalfOf, optionType, strikeId, amount, maximumPremium);
         _totalLockedAssets += lockedValue;
-        OpenPositionEventParameters memory eventParameters;
-        eventParameters.expiration = strike_.expiry;
-        eventParameters.entryPrice = strike_.entryPrice;
-        eventParameters.strikePrice = strike_.strikePrice;
-        eventParameters.optionType = optionType;
-        eventParameters.amount = amount;
-        eventParameters.premium = premium;
-        eventParameters.keeperFee = KEEPER_FEE;
+        OpenPositionEventParameters memory eventParameters = OpenPositionEventParameters(
+            optionType,
+            strike_.expiry,
+            strike_.entryPrice,
+            strike_.strikePrice,
+            amount,
+            premium,
+            KEEPER_FEE
+        );
         emit OpenPosition(_msgSender(), onBehalfOf, collection, positionId, eventParameters);
+        positionId = optionToken.openPosition(_msgSender(), onBehalfOf, optionType, strikeId, amount, maximumPremium);
         IERC20(_asset).safeTransferFrom(_msgSender(), address(this), maximumPremium + KEEPER_FEE);
         return (positionId, premium);
     }
@@ -450,9 +481,6 @@ contract Vault is IVault, Pausable, Ownable{
             _collectionDelta = _collectionDelta.iMulDiv(int256(optionToken.totalAmount()), UNIT, Math.Rounding.Down);
             _collectionDelta -= delta.iMulDiv(int256(position.amount), UNIT, Math.Rounding.Down);
             _collectionPNL += int256(premium) - int256(unadjustedPremium.mulDiv(position.amount, UNIT, Math.Rounding.Down));
-            optionToken.activePosition(positionId, premium);
-            _collectionDelta = _collectionDelta.iMulDiv(int256(UNIT), optionToken.totalAmount(), Math.Rounding.Down);
-            IAssetRiskCache(_riskCache).updateAssetRisk(collection, _collectionDelta, _collectionPNL);
             //transfer premium from the caller to the vault
             uint256 amountToReserve = premium.mulDiv(RESERVE_RATIO, GENERAL_UNIT, Math.Rounding.Up);
             _strikes[position.strikeId] = strike_;
@@ -460,6 +488,9 @@ contract Vault is IVault, Pausable, Ownable{
             uint256 excessPremium = position.maximumPremium - premium;
             LPToken(_lpToken).increaseTotalAssets(premium - amountToReserve);
             emit ActivatePosition(optionToken.ownerOf(positionId), collection, positionId, premium, excessPremium, delta);
+            optionToken.activePosition(positionId, premium);
+            _collectionDelta = _collectionDelta.iMulDiv(int256(UNIT), optionToken.totalAmount(), Math.Rounding.Down);
+            IAssetRiskCache(_riskCache).updateAssetRisk(collection, _collectionDelta, _collectionPNL);
             IERC20(_asset).safeTransfer(_reserve, amountToReserve + KEEPER_FEE);
             IERC20(_asset).safeTransfer(_lpToken, premium - amountToReserve);
             if(excessPremium > 0){
@@ -614,8 +645,8 @@ contract Vault is IVault, Pausable, Ownable{
     }
 
     function sendAssetsToLPToken(uint256 amount) public {
+        emit SendAssetsToLPToken(_msgSender(), amount);
         IERC20(_asset).safeTransferFrom(_msgSender(), _lpToken, amount);
         LPToken(_lpToken).increaseTotalAssets(amount);
-        emit SendAssetsToLPToken(_msgSender(), amount);
     }
 }

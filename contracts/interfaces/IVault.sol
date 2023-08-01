@@ -31,7 +31,7 @@ interface IVault {
     event CreateStrike(uint256 indexed strikeId, uint256 duration, uint256 expiration, uint256 entryPrice, uint256 strikePrice);
     event DestoryStrike(uint256 indexed strikeId);
     event CreateMarket(address indexed collection, uint32 weight, address optionToken);
-    event KeeperAddressUpdated(address indexed keeperAddress);
+    event UpdateKeeper(address indexed operator, address indexed keeperAddress);
     event UpdateLPTokenPrice(address indexed lpToken, uint256 newPrice);
     event PauseVault(address indexed operator);
     event UnpauseVault(address indexed operator);
@@ -71,6 +71,7 @@ interface IVault {
     function MINIMUM_DURATION() external view returns(uint256);
     function TIME_SCALE() external view returns(uint256);
     
+    function decimals() external view returns(uint8);
     function keeper() external view returns(address);
     function setKeeper(address keeperAddress) external;
     function reserve() external view returns(address);
@@ -132,5 +133,6 @@ interface IVault {
     error FrozenMarket(address thrower, address collection);
     error DeactivatedMarket(address thrower, address collection);
     error OnlyKeeperOrOwnerOrPayer(address thrower, address caller, address keeper, address owner, address payer);
+    error ZeroAddress(address thrower);
 }
 

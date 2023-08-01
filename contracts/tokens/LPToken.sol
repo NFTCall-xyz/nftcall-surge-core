@@ -48,8 +48,8 @@ contract LPToken is ILPToken, ERC4626, Ownable, SimpleInitializable {
         }
         _vault = vaultAddress;
         _maximumVaultBalance = maxVaultBalance;
-        IERC20(asset()).safeApprove(vaultAddress, type(uint256).max);
         emit Initialize(vaultAddress, maxVaultBalance);
+        IERC20(asset()).safeApprove(vaultAddress, type(uint256).max);
     }
 
     function vault() public view override returns(address) {
@@ -228,8 +228,8 @@ contract LPToken is ILPToken, ERC4626, Ownable, SimpleInitializable {
         if(amount == 0){
             revert NoAssetsToCollect(address(this));
         }
-        IERC20(asset()).safeTransfer(receiver, amount);
         emit Collect(receiver, amount);
+        IERC20(asset()).safeTransfer(receiver, amount);
         return amount;
     }
 
@@ -279,14 +279,14 @@ contract LPToken is ILPToken, ERC4626, Ownable, SimpleInitializable {
         // shares are burned and after the assets are transferred, which is a valid state.
         _burn(owner, shares);
         uint256 fee = assets.mulDiv(WITHDRAW_FEE_RATIO, GENERAL_UNIT, Math.Rounding.Up);
-        IERC20 erc20Asset = IERC20(asset());
-        address reserve = IVault(_vault).reserve();
-        erc20Asset.safeTransfer(reserve, fee);
         uint256 feeShares = _convertToShares(fee, Math.Rounding.Up);
         _totalAssets -= assets;
-        erc20Asset.safeTransfer(receiver, (assets - fee));
+        IERC20 erc20Asset = IERC20(asset());
+        address reserve = IVault(_vault).reserve();
         emit Withdraw(caller, reserve, owner, fee, feeShares);
         emit Withdraw(caller, receiver, owner, assets - fee, shares - feeShares);
+        erc20Asset.safeTransfer(reserve, fee);
+        erc20Asset.safeTransfer(receiver, (assets - fee));
     }
 
     /**

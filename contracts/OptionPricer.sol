@@ -135,7 +135,7 @@ contract OptionPricer is IPricer, Ownable, SimpleInitializable {
     pricesDeltaStdVega = BlackScholes.pricesDeltaStdVega(bsInput);
   }
 
-  function delta(uint S, uint K, uint vol, uint duration) public view override returns (int callDelta, int putDelta) {
+  function optionDelta(uint S, uint K, uint vol, uint duration) public view override returns (int callDelta, int putDelta) {
     uint decimalsDiff = 10 ** (DecimalMath.decimals-GENERAL_DECIMALS);
     BlackScholes.BlackScholesInputs memory bsInput = BlackScholes.BlackScholesInputs(
       duration,
