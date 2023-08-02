@@ -407,6 +407,15 @@ contract Vault is IVault, Pausable, Ownable{
         return pricer.getAdjustedVol(collection, optionType, strikePrice, lockedValue);
     }
 
+    struct OpenPositionLocalVars {
+        OptionToken optionToken;
+        Strike strike;
+        address caller;
+        uint256 strikeId;
+        uint256 lockedValue;
+        uint256 minimumPremium;
+    }
+
     //for options
     function openPosition(address collection, address onBehalfOf, OptionType optionType, uint256 strikePrice, uint256 expiry, uint256 amount, uint256 maximumPremium) 
         public override onlyUnpaused
@@ -418,31 +427,43 @@ contract Vault is IVault, Pausable, Ownable{
         if(!_collections[collection].activated){
             revert DeactivatedMarket(address(this), collection);
         }
-        Strike memory strike_;
-        (premium, strike_) = _estimatePremium(collection, optionType, strikePrice, expiry, amount);
-        uint256 strikeId = _nextId++;
-        _strikes[strikeId] = strike_;
-        emit CreateStrike(strikeId, strike_.duration, strike_.expiry, strike_.entryPrice, strike_.strikePrice);
-        uint256 lockedValue = _lockedValue(optionType, strike_.entryPrice, strike_.strikePrice, amount);
-        uint256 minimumPremium_ = _assetReturn(lockedValue, strike_.duration, _minimumAnnualRateOfReturnOnLockedAssets);
-        premium = Math.max(premium, minimumPremium_);
+        OpenPositionLocalVars memory vars;
+        (premium, vars.strike) = _estimatePremium(collection, optionType, strikePrice, expiry, amount);
+        vars.strikeId = _nextId++;
+        _strikes[vars.strikeId] = vars.strike;
+        emit CreateStrike(vars.strikeId, vars.strike.duration, vars.strike.expiry, vars.strike.entryPrice, vars.strike.strikePrice);
+        vars.lockedValue = _lockedValue(optionType, vars.strike.entryPrice, vars.strike.strikePrice, amount);
+        vars.minimumPremium = _assetReturn(vars.lockedValue, vars.strike.duration, _minimumAnnualRateOfReturnOnLockedAssets);
+        premium = Math.max(premium, vars.minimumPremium);
 
         //mint option token
-        OptionToken optionToken = OptionToken( _collections[collection].optionToken);
-        _totalLockedAssets += lockedValue;
+        vars.optionToken = OptionToken( _collections[collection].optionToken);
+        _totalLockedAssets += vars.lockedValue;
         OpenPositionEventParameters memory eventParameters = OpenPositionEventParameters(
             optionType,
-            strike_.expiry,
-            strike_.entryPrice,
-            strike_.strikePrice,
+            vars.strike.expiry,
+            vars.strike.entryPrice,
+            vars.strike.strikePrice,
             amount,
             premium,
             KEEPER_FEE
         );
-        emit OpenPosition(_msgSender(), onBehalfOf, collection, positionId, eventParameters);
-        positionId = optionToken.openPosition(_msgSender(), onBehalfOf, optionType, strikeId, amount, maximumPremium);
-        IERC20(_asset).safeTransferFrom(_msgSender(), address(this), maximumPremium + KEEPER_FEE);
+        vars.caller = _msgSender();
+        emit OpenPosition(vars.caller, onBehalfOf, collection, positionId, eventParameters);
+        positionId = vars.optionToken.openPosition(vars.caller, onBehalfOf, optionType, vars.strikeId, amount, maximumPremium);
+        IERC20(_asset).safeTransferFrom(vars.caller, address(this), maximumPremium + KEEPER_FEE);
         return (positionId, premium);
+    }
+
+    struct ActivatePositionLocalVars {
+        OptionToken optionToken;
+        OptionPosition position;
+        Strike strike;
+        uint256 excessPremium;
+        uint256 unadjustedPremium;
+        int256 collectionDelta;
+        int256 collectionPNL;
+        uint256 amountToReserve;
     }
 
     function activatePosition(address collection, uint256 positionId) public override onlyKeeper onlyUnpaused returns(uint256 premium, int256 delta){
@@ -452,54 +473,59 @@ contract Vault is IVault, Pausable, Ownable{
         if(!_collections[collection].activated){
             revert DeactivatedMarket(address(this), collection);
         }
-        OptionToken optionToken = OptionToken(_collections[collection].optionToken);
-        OptionPosition memory position = optionToken.optionPosition(positionId);
-        Strike memory strike_ = _strikes[position.strikeId];
-        if(block.timestamp + strike_.duration - strike_.expiry > _timeWindowForActivation){
-            emit FailPosition(optionToken.ownerOf(positionId), collection, positionId, position.premium, FailureReason.EXPIRED);
+        ActivatePositionLocalVars memory vars;
+        vars.optionToken = OptionToken(_collections[collection].optionToken);
+        vars.position = vars.optionToken.optionPosition(positionId);
+        vars.strike = _strikes[vars.position.strikeId];
+        if(block.timestamp + vars.strike.duration - vars.strike.expiry > _timeWindowForActivation){
+            emit FailPosition(vars.optionToken.ownerOf(positionId), collection, positionId, vars.position.premium, FailureReason.EXPIRED);
             _closePendingPosition(collection, positionId);
             return (0, 0);
         }
-        strike_.duration = strike_.expiry - block.timestamp;
-        strike_.entryPrice = IOracle(_oracle).getAssetPrice(collection);
-        premium = _adjustedPremium(collection, position.optionType, strike_, position.amount);
-        premium = premium.mulDiv(position.amount, UNIT, Math.Rounding.Up);
-        if(premium > position.maximumPremium){
-            emit FailPosition(optionToken.ownerOf(positionId), collection, positionId, position.maximumPremium, FailureReason.PREMIUM_TOO_HIGH);
+        vars.strike.duration = vars.strike.expiry - block.timestamp;
+        vars.strike.entryPrice = IOracle(_oracle).getAssetPrice(collection);
+        premium = _adjustedPremium(collection, vars.position.optionType, vars.strike, vars.position.amount);
+        premium = premium.mulDiv(vars.position.amount, UNIT, Math.Rounding.Up);
+        if(premium > vars.position.maximumPremium){
+            emit FailPosition(vars.optionToken.ownerOf(positionId), collection, positionId, vars.position.maximumPremium, FailureReason.PREMIUM_TOO_HIGH);
             _closePendingPosition(collection, positionId);
         }
         else{
             uint256 minimumPremium_ = _assetReturn(
-                _lockedValue(position.optionType, strike_.entryPrice, strike_.strikePrice, position.amount),
-                strike_.duration, 
+                _lockedValue(vars.position.optionType, vars.strike.entryPrice, vars.strike.strikePrice, vars.position.amount),
+                vars.strike.duration, 
                 _minimumAnnualRateOfReturnOnLockedAssets);
             premium = Math.max(premium, minimumPremium_);
             _unrealizedPremium += premium;
-            uint256 unadjustedPremium;
-            (unadjustedPremium, delta) = _premiumAndDelta(collection, position.optionType, strike_.entryPrice, strike_.strikePrice, strike_.duration);
-            (int256 _collectionDelta, int256 _collectionPNL) = IAssetRiskCache(_riskCache).getAssetRisk(collection);
-            _collectionDelta = _collectionDelta.iMulDiv(int256(optionToken.totalAmount()), UNIT, Math.Rounding.Down);
-            _collectionDelta -= delta.iMulDiv(int256(position.amount), UNIT, Math.Rounding.Down);
-            _collectionPNL += int256(premium) - int256(unadjustedPremium.mulDiv(position.amount, UNIT, Math.Rounding.Down));
+            (vars.unadjustedPremium, delta) = _premiumAndDelta(collection, vars.position.optionType, vars.strike.entryPrice, vars.strike.strikePrice, vars.strike.duration);
+            (vars.collectionDelta, vars.collectionPNL) = IAssetRiskCache(_riskCache).getAssetRisk(collection);
+            vars.collectionDelta = vars.collectionDelta.iMulDiv(int256(vars.optionToken.totalAmount()), UNIT, Math.Rounding.Down);
+            vars.collectionDelta -= delta.iMulDiv(int256(vars.position.amount), UNIT, Math.Rounding.Down);
+            vars.collectionPNL += int256(premium) - int256(vars.unadjustedPremium.mulDiv(vars.position.amount, UNIT, Math.Rounding.Down));
             //transfer premium from the caller to the vault
-            uint256 amountToReserve = premium.mulDiv(RESERVE_RATIO, GENERAL_UNIT, Math.Rounding.Up);
-            _strikes[position.strikeId] = strike_;
-            address payer = position.payer;
-            uint256 excessPremium = position.maximumPremium - premium;
-            LPToken(_lpToken).increaseTotalAssets(premium - amountToReserve);
-            emit ActivatePosition(optionToken.ownerOf(positionId), collection, positionId, premium, excessPremium, delta);
-            optionToken.activePosition(positionId, premium);
-            _collectionDelta = _collectionDelta.iMulDiv(int256(UNIT), optionToken.totalAmount(), Math.Rounding.Down);
-            IAssetRiskCache(_riskCache).updateAssetRisk(collection, _collectionDelta, _collectionPNL);
-            IERC20(_asset).safeTransfer(_reserve, amountToReserve + KEEPER_FEE);
-            IERC20(_asset).safeTransfer(_lpToken, premium - amountToReserve);
-            if(excessPremium > 0){
-                IERC20(_asset).safeTransfer(payer, position.maximumPremium - premium);
+            vars.amountToReserve = premium.mulDiv(RESERVE_RATIO, GENERAL_UNIT, Math.Rounding.Up);
+            _strikes[vars.position.strikeId] = vars.strike;
+            vars.excessPremium = vars.position.maximumPremium - premium;
+            LPToken(_lpToken).increaseTotalAssets(premium - vars.amountToReserve);
+            _activatePosition(collection, vars.optionToken, positionId, premium, vars.excessPremium, delta);
+            vars.collectionDelta = vars.collectionDelta.iMulDiv(int256(UNIT), vars.optionToken.totalAmount(), Math.Rounding.Down);
+            IAssetRiskCache(_riskCache).updateAssetRisk(collection, vars.collectionDelta, vars.collectionPNL);
+            IERC20(_asset).safeTransfer(_reserve, vars.amountToReserve + KEEPER_FEE);
+            IERC20(_asset).safeTransfer(_lpToken, premium - vars.amountToReserve);
+            if(vars.excessPremium > 0){
+                IERC20(_asset).safeTransfer(vars.position.payer, vars.excessPremium);
             }
             uint256 price = LPToken(_lpToken).convertToAssets(HIGH_PRECISION_UNIT);
             emit UpdateLPTokenPrice(_lpToken, price);
         }
     }
+
+    function _activatePosition(address collection, OptionToken optionToken, uint256 positionId, uint256 premium, uint256 excessPremium, int256 delta) internal{
+            emit ActivatePosition(optionToken.ownerOf(positionId), collection, positionId, premium, excessPremium, delta);
+            optionToken.activePosition(positionId, premium);
+            
+    }
+
 
     function positionPNLWeightedDelta(address collection, uint256 positionId) public view override returns(int256 unrealizePNL, int256 weightedDelta) {
         OptionToken optionToken = OptionToken(_collections[collection].optionToken);
