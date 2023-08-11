@@ -16,7 +16,6 @@ makeSuite('Vault', (testEnv) => {
       throw new Error('testEnv not initialized');
     }
     const amount = ethers.utils.parseEther("10000");
-    await waitTx(await eth.mint(amount));
     await waitTx(await eth.approve(lpToken.address, amount));
     await waitTx(await vault.deposit(amount, deployer.address));
     const lockedBalance = await lpToken.lockedBalanceOf(deployer.address);
@@ -59,7 +58,6 @@ makeSuite('Vault', (testEnv) => {
     expect(await lpToken.balanceOf(deployer.address)).to.be.equal(0);
     const releaseTime = await lpToken.releaseTime(deployer.address);
     await time.increase(BigNumber.from(24*3600).div(timeScale).toNumber());
-    await waitTx(await eth.mint(amount));
     await waitTx(await eth.approve(lpToken.address, amount));
     await waitTx(await vault.deposit(amount, deployer.address));
     await time.increaseTo(releaseTime.toNumber());
@@ -88,7 +86,6 @@ makeSuite('Vault', (testEnv) => {
     }
     const balance = await lpToken.balanceOf(deployer.address);
     const amount = ethers.utils.parseEther("100");
-    await waitTx(await eth.mint(amount));
     await waitTx(await eth.approve(lpToken.address, amount));
     await waitTx(await vault.deposit(amount, deployer.address));
     expect(await lpToken.lockedBalanceOf(deployer.address)).to.be.equal(amount);
@@ -100,12 +97,13 @@ makeSuite('Vault', (testEnv) => {
     if(vault === undefined || lpToken === undefined || eth === undefined || deployer === undefined || reserve === undefined){
       throw new Error('testEnv not initialized');
     }
+    const beforeBalance = await eth.balanceOf(deployer.address);
     const amount = ethers.utils.parseEther("100");
     const fee = amount.mul(3).div(1000);
     await waitTx(await lpToken.approve(vault.address, amount));
     await waitTx(await vault.withdraw(amount, deployer.address));
     const balance = await eth.balanceOf(deployer.address);
-    expect(balance).to.be.equal(amount.sub(fee));
+    expect(balance).to.be.equal(beforeBalance.add(amount.sub(fee)));
     const reserveBalance = await eth.balanceOf(reserve.address);
     expect(reserveBalance).to.be.equal(fee);
   });
@@ -147,7 +145,6 @@ makeSuite('Vault', (testEnv) => {
     const releaseTime = await lpToken.releaseTime(deployer.address);
     await time.increaseTo(releaseTime.toNumber());
     expect(await lpToken.balanceOf(deployer.address)).to.be.equal(lockedBalance);
-    await waitTx(await eth.mint(amount));
     await waitTx(await eth.approve(lpToken.address, amount));
     await waitTx(await vault.deposit(amount, deployer.address));
     const newReleaseTime = await lpToken.releaseTime(deployer.address);

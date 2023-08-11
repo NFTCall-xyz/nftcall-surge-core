@@ -165,8 +165,8 @@ export const deployBackstopPool = async (verify: boolean = false) => {
     return backstopPool;
 }
 
-export const deployMintableERC20 = async (name: string, symbol: string, verify: boolean = false) => {
-    const erc20 = await deployContract<MintableERC20>('MintableERC20', [name, symbol], symbol, undefined, undefined, verify);
+export const deployMintableERC20 = async (name: string, symbol: string, initialMaxMintAmountPerUser: string, verify: boolean = false) => {
+    const erc20 = await deployContract<MintableERC20>('MintableERC20', [name, symbol, initialMaxMintAmountPerUser], symbol, undefined, undefined, verify);
     return erc20;
 }
 
