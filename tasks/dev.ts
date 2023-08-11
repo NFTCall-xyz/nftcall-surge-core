@@ -46,7 +46,7 @@ task('dev:full', 'Deploy all contracts')
         await hre.run('reserve:deploy', { verify });
         await hre.run('vault:deploy', { verify, asset: lpAsset });
         await hre.run('lpToken:init', { maximumSupply: '10000000' });
-        await hre.run('mocked:erc20:init', {symbol: lpAsset, limit: "100"});
+        await hre.run('mocked:erc20:init', {symbol: lpAsset, limit: "10"});
         await hre.run('oracle:setOperator', { operator: operatorAddress });
         for (const [nft, market] of Object.entries(markets)) {
             await hre.run('oracle:addAsset', { asset:  nft});
@@ -107,6 +107,7 @@ task('dev:update', 'Deploy updated contracts')
         await hre.run('backstopPool:deploy', { verify });
         await hre.run('vault:deploy', { verify, asset: lpAsset });
         await hre.run('lpToken:init', { maximumSupply: '10000000' });
+        await hre.run('mocked:erc20:init', {symbol: lpAsset, limit: "10"});
         await hre.run('pricer:init');
         for (const [nft, market] of Object.entries(markets)) {
             await hre.run(
