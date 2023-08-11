@@ -165,7 +165,7 @@ export const deployBackstopPool = async (verify: boolean = false) => {
     return backstopPool;
 }
 
-export const deployMintableERC20 = async (name: string, symbol: string, initialMaxMintAmountPerUser: string, verify: boolean = false) => {
+export const deployMintableERC20 = async (name: string, symbol: string, initialMaxMintAmountPerUser: BigNumber, verify: boolean = false) => {
     const erc20 = await deployContract<MintableERC20>('MintableERC20', [name, symbol, initialMaxMintAmountPerUser], symbol, undefined, undefined, verify);
     return erc20;
 }
@@ -299,6 +299,24 @@ export const initializeMarket = async(marketName: string, weight: BigNumber) => 
         throw Error(`The OptionToken for ${marketName} is not deployed`);
     }
     await waitTx(await vault.addMarket(nftAddress, weight, optionTokenAddress));
+}
+
+export const initializeMintableERC20 = async (symbol: string, mintLimit: BigNumber) => {
+    const erc20Token = await getMintableERC20(symbol);
+    if(erc20Token === undefined){
+        throw Error(`MintableERC20 for ${symbol} is not deployed`);
+    }
+    const vault = await getVault();
+    if(vault === undefined) {
+        throw Error('Vault is not deployed');
+    }
+    const lpToken = await getLPToken();
+    if(lpToken === undefined) {
+        throw Error('LPToken is not deployed');
+    }
+    await waitTx(await erc20Token.setWhitelistAddress(vault.address, true));
+    await waitTx(await erc20Token.setWhitelistAddress(lpToken.address, true));
+    await waitTx(await erc20Token.setMaxMintAmountPerUser(mintLimit));
 }
 
 export const deploySurgeUI = async ( verify: boolean = false) => {

@@ -13,6 +13,7 @@ import {
     deployBlackScholes,
     deployKeeperHelper,
     initializeLPToken,
+    initializeMintableERC20,
     initializeOptionToken,
     initializeMarket,
     deployBackstopPool
@@ -29,12 +30,11 @@ async function buildTestEnv() {
 
     // oracle
     const [ _, owner, operator, ...a] = accounts;
-    const erc20 = await deployMintableERC20("Mocked WETH", "WETH", bigNumber(1000000, 18).toString());
+    const erc20 = await deployMintableERC20("Mocked WETH", "WETH", bigNumber(0));
     const nft = await deployMintableERC721("Mocked BAYC", "BAYC");
     const oracle = await deployOracle(await operator.getAddress());
     const lpToken = await deployLPToken(erc20.address, 'NFTCall ETH', 'ncETH');
     await erc20.setWhitelistAddress(lpToken.address, true);
-    await erc20.mint();
     await deployBlackScholes();
     const pricer = await deployPricer();
     const riskCache = await deployRiskCache();
@@ -44,6 +44,7 @@ async function buildTestEnv() {
     await erc20.setWhitelistAddress(vault.address, true);
     await riskCache.transferOwnership(vault.address);
     await initializeLPToken(bigNumber(1000000, 18));
+    await initializeMintableERC20("WETH", bigNumber(100, 18));
     const optionToken = await deployOptionToken(nft.address, "NFTCall BAYC Options Token", "ncBAYC", "https://bayc.finance/", "BAYC");
     await oracle.addAssets([nft.address]);
     await oracle.setOperator(operator.address);
