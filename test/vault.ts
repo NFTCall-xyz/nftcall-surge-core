@@ -121,7 +121,7 @@ makeSuite('Vault', (testEnv) => {
     await waitTx(await lpToken.approve(vault.address, amount));
     await expect(vault.withdraw(amount, deployer.address))
           .to.be.revertedWithCustomError(lpToken, "WithdrawMoreThanMax")
-          .withArgs(lpToken.address, amount, totalAssets.div(2));
+          .withArgs(lpToken.address, amount, amount.div(2));
   });
 
   it("Should be able to transfer balance to another user", async () => {

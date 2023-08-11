@@ -6,7 +6,7 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IVault} from "../interfaces/IVault.sol";
 import {SimpleInitializable} from "../libraries/SimpleInitializable.sol";
-import {GENERAL_UNIT} from "../libraries/DataTypes.sol";
+import {GENERAL_UNIT, UNIT} from "../libraries/DataTypes.sol";
 
 import "../interfaces/ILPToken.sol";
 
@@ -23,6 +23,7 @@ contract LPToken is ILPToken, ERC4626, Ownable, SimpleInitializable {
     uint256 private _minimumAssetToShareRatio = GENERAL_UNIT * 10 / 100; // 10%
     uint256 private _totalLockedBalance = 0;
     uint256 private _totalAssets = 0;
+    uint256 private _wholeWithdrawLimit = 1 * UNIT; // 1 eth;
     uint256 public constant MAXIMUM_WITHDRAW_RATIO = GENERAL_UNIT * 50 / 100; // 50%
     uint256 public constant WITHDRAW_FEE_RATIO = GENERAL_UNIT * 3 / 1000; // 0.3%
     uint256 public constant LOCK_PERIOD = 3 days;
@@ -54,6 +55,15 @@ contract LPToken is ILPToken, ERC4626, Ownable, SimpleInitializable {
 
     function vault() public view override returns(address) {
         return _vault;
+    }
+
+    function wholeWithdrawLimit() public view override returns(uint256) {
+        return _wholeWithdrawLimit;
+    }
+
+    function setWholeWithdrawLimit(uint256 limit) public override onlyOwner {
+        _wholeWithdrawLimit = limit;
+        emit UpdateWholeWithdrawLimit(limit);
     }
 
     function maximumVaultBalance() public view override returns(uint256) {
@@ -133,6 +143,9 @@ contract LPToken is ILPToken, ERC4626, Ownable, SimpleInitializable {
         if(userBalance == 0) {
             return 0;
         }
+        if(_convertToAssets(userBalance, Math.Rounding.Up) > _wholeWithdrawLimit){
+            userBalance = userBalance.mulDiv(MAXIMUM_WITHDRAW_RATIO, GENERAL_UNIT, Math.Rounding.Down);
+        }
         userBalance = _convertToAssets(userBalance, Math.Rounding.Down);
         return Math.min(userBalance, _maxWithdrawBalance());
     }
@@ -146,12 +159,26 @@ contract LPToken is ILPToken, ERC4626, Ownable, SimpleInitializable {
         if(userBalance == 0) {
             return 0;
         }
+        if(_convertToAssets(userBalance, Math.Rounding.Up) > _wholeWithdrawLimit){
+            userBalance = userBalance.mulDiv(MAXIMUM_WITHDRAW_RATIO, GENERAL_UNIT, Math.Rounding.Down);
+        }
         return Math.min(userBalance, _convertToShares(_maxWithdrawBalance(), Math.Rounding.Down));
     }
 
     function _maxWithdrawBalance() internal view returns (uint256) {
         uint256 _totalLockedAssets = IVault(_vault).totalLockedAssets();
-        return (_totalAssets > _totalLockedAssets) ? (_totalAssets - _totalLockedAssets).mulDiv(MAXIMUM_WITHDRAW_RATIO, GENERAL_UNIT, Math.Rounding.Down) : 0;
+        if (_totalAssets <= _totalLockedAssets) {
+            return 0;
+        }
+        else {
+            uint256 limit = _totalAssets - _totalLockedAssets;
+            if(limit < _wholeWithdrawLimit){
+                return limit;
+            }
+            else {
+                return limit.mulDiv(MAXIMUM_WITHDRAW_RATIO, GENERAL_UNIT, Math.Rounding.Down);
+            }
+        }
     }
 
     function deposit(uint256 assets, address receiver) public override returns(uint256){
