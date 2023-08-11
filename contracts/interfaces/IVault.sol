@@ -101,7 +101,7 @@ interface IVault {
     function markets() external view returns(address[] memory);
     function marketConfiguration(address collection) external view returns(CollectionConfiguration memory);
     function maximumOptionAmount(address collection, OptionType optionType) external view returns(uint256);
-    function minimumPremium(OptionType optionType, uint256 strikePrice, uint256 expiry, uint256 amount) external view returns(uint256);
+    function minimumPremium(address collection, OptionType optionType, uint256 strikePrice, uint256 expiry, uint256 amount) external view returns(uint256);
     function pause() external;
     function unpause() external;
     function isPaused() external view returns(bool);

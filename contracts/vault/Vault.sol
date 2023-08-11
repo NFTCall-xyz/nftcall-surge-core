@@ -265,8 +265,8 @@ contract Vault is IVault, Pausable, Ownable{
         return amount.mulDiv(annualRate, UNIT, Math.Rounding.Up).mulDiv(duration, _SECONDS_PRE_YEAR, Math.Rounding.Up);
     }
 
-    function minimumPremium(OptionType optionType, uint256 strikePrice, uint256 expiry, uint256 amount) public view override returns(uint256) {
-        uint256 entryPrice = IOracle(_oracle).getAssetPrice(_asset);
+    function minimumPremium(address collection, OptionType optionType, uint256 strikePrice, uint256 expiry, uint256 amount) public view override returns(uint256) {
+        uint256 entryPrice = IOracle(_oracle).getAssetPrice(collection);
         uint256 duration = expiry - block.timestamp;
         uint256 lockedValue = _lockedValue(optionType, entryPrice, strikePrice, amount);
         return _assetReturn(lockedValue, duration, _minimumAnnualRateOfReturnOnLockedAssets);
