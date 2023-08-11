@@ -59,6 +59,9 @@ interface IVault {
     event SendAssetsToLPToken(address indexed operator, uint256 amount);
     event UpdateMinimumAnnualRateOfReturnOnLockedAssets(address indexed operator, uint256 ratio);
     event UpdateTimeWindowForActivation(address indexed operator, uint256 timeWindows);
+    event UpdateCallStrikePriceRatioRange(address indexed operator, uint256 minimumRatio, uint256 maximumRatio);
+    event UpdatePutStrikePriceRatioRange(address indexed operator, uint256 minimumRatio, uint256 maximumRatio);
+    event UpdateDurationRange(address indexed operator, uint256 minimumDuration, uint256 maximumDuration);
 
     function KEEPER_FEE() external view returns(uint256);
     function RESERVE_RATIO() external view returns(uint256);
@@ -90,6 +93,9 @@ interface IVault {
     function setMinimumAnnualRateOfReturnOnLockedAssets(uint256 ratio) external;
     function timeWindowForActivation() external view returns(uint256);
     function setTimeWindowForActivation(uint256 timeWindows) external;
+    function setCallStrikePriceRatioRange(uint256 minimumRatio, uint256 maximumRatio) external;
+    function setPutStrikePriceRatioRange(uint256 minimumRatio, uint256 maximumRatio) external;
+    function setDurationRange(uint256 minimumDuration, uint256 maximumDuration) external;
     function adjustedVolatility(address collection, OptionType optionType, uint256 strikePrice, uint256 amount) external view returns(uint256);
     function openPosition(address collection, address onBehalfOf, OptionType optionType, uint256 strikePrice, uint256 expiry, uint256 amount, uint256 maximumPremium) external returns(uint256 positionId, uint256 premium);
     function activatePosition(address collection, uint256 positionId) external returns(uint256 premium, int256 delta);
@@ -134,5 +140,8 @@ interface IVault {
     error DeactivatedMarket(address thrower, address collection);
     error OnlyKeeperOrOwnerOrPayer(address thrower, address caller, address keeper, address owner, address payer);
     error ZeroAddress(address thrower);
+    error InvalidCallStrikePriceRatioRange(address thrower, uint256 minimumRatio, uint256 maximumRatio);
+    error InvalidPutStrikePriceRatioRange(address thrower, uint256 minimumRatio, uint256 maximumRatio);
+    error InvalidDurationRange(address thrower, uint256 minimumDuration, uint256 maximumDuration);
 }
 

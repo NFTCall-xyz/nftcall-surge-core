@@ -60,15 +60,15 @@ contract Vault is IVault, Pausable, Ownable{
     uint256 public override constant RESERVE_RATIO = GENERAL_UNIT * 10 / 100; // 10%
     uint256 public override constant MAXIMUM_LOCK_RATIO = GENERAL_UNIT * 95 / 100; // 95%
 
-    uint256 public override constant MAXIMUM_CALL_STRIKE_PRICE_RATIO = GENERAL_UNIT * 210 / 100; // 210%
-    uint256 public override constant MINIMUM_CALL_STRIKE_PRICE_RATIO = GENERAL_UNIT * 110 / 100; // 110%
-    uint256 public override constant MAXIMUM_PUT_STRIKE_PRICE_RATIO = GENERAL_UNIT * 90 / 100; // 90%
-    uint256 public override constant MINIMUM_PUT_STRIKE_PRICE_RATIO = GENERAL_UNIT * 50 / 100; // 50%
+    uint256 private _maximumCallStrikePriceRatio = GENERAL_UNIT * 210 / 100; // 210%
+    uint256 private _minimumCallStrikePriceRatio = GENERAL_UNIT * 110 / 100; // 110%
+    uint256 private _maximumPutStrikePriceRatio = GENERAL_UNIT * 90 / 100; // 90%
+    uint256 private _minimumPutStrikePriceRatie = GENERAL_UNIT * 50 / 100; // 50%
     uint256 public override constant KEEPER_FEE = 5 * 10**13; // 0.00005 ETH
     uint256 public override constant TIME_SCALE = 1;
 
-    uint256 public override constant MINIMUM_DURATION = 3 days;
-    uint256 public override constant MAXIMUM_DURATION = 30 days;
+    uint256 private _minimumDuration = 3 days;
+    uint256 private _maximumDuration = 30 days;
 
     constructor (address asset, address lpToken, address oracle, address pricer, address riskCache, address reserve_, address backstopPool_)
         Ownable()
@@ -241,6 +241,57 @@ contract Vault is IVault, Pausable, Ownable{
         return PROFIT_FEE_RATIO;
     }
 
+    function MAXIMUM_CALL_STRIKE_PRICE_RATIO() public override view returns(uint256) {
+        return _maximumCallStrikePriceRatio;
+    }
+
+    function MINIMUM_CALL_STRIKE_PRICE_RATIO() public override view returns(uint256) {
+        return _minimumCallStrikePriceRatio;
+    }
+
+    function MAXIMUM_PUT_STRIKE_PRICE_RATIO() public override view returns(uint256) {
+        return _maximumPutStrikePriceRatio;
+    }
+
+    function MINIMUM_PUT_STRIKE_PRICE_RATIO() public override view returns(uint256) {
+        return _minimumPutStrikePriceRatie;
+    }
+
+    function MINIMUM_DURATION() public override view returns(uint256) {
+        return _minimumDuration;
+    }
+
+    function MAXIMUM_DURATION() public override view returns(uint256) {
+        return _maximumDuration;
+    }
+
+    function setCallStrikePriceRatioRange(uint256 minimumRatio, uint256 maximumRatio) public override onlyOwner{
+        if(minimumRatio <= GENERAL_UNIT || minimumRatio >= maximumRatio){
+            revert InvalidCallStrikePriceRatioRange(address(this), minimumRatio, maximumRatio);
+        }
+        _minimumCallStrikePriceRatio = minimumRatio;
+        _maximumCallStrikePriceRatio = maximumRatio;
+        emit UpdateCallStrikePriceRatioRange(_msgSender(), minimumRatio, maximumRatio);
+    }
+
+    function setPutStrikePriceRatioRange(uint256 minimumRatio, uint256 maximumRatio) public override onlyOwner{
+        if(maximumRatio >= GENERAL_UNIT || minimumRatio >= maximumRatio){
+            revert InvalidPutStrikePriceRatioRange(address(this), minimumRatio, maximumRatio);
+        }
+        _minimumPutStrikePriceRatie = minimumRatio;
+        _maximumPutStrikePriceRatio = maximumRatio;
+        emit UpdatePutStrikePriceRatioRange(_msgSender(), minimumRatio, maximumRatio);
+    }
+
+    function setDurationRange(uint256 minimumDuration, uint256 maximumDuration) public override onlyOwner{
+        if(minimumDuration == 0 || minimumDuration >= maximumDuration){
+            revert InvalidDurationRange(address(this), minimumDuration, maximumDuration);
+        }
+        _minimumDuration = minimumDuration;
+        _maximumDuration = maximumDuration;
+        emit UpdateDurationRange(_msgSender(), minimumDuration, maximumDuration);
+    }
+
     function deposit(uint256 amount, address onBehalfOf) public override onlyUnpaused{
         LPToken(_lpToken).deposit(amount, _msgSender(), onBehalfOf);
     }
@@ -277,17 +328,17 @@ contract Vault is IVault, Pausable, Ownable{
             revert ZeroAmount(address(this));
         }
         if(optionType == OptionType.LONG_CALL){
-            if(strike_.strikePrice > strike_.entryPrice.mulDiv(MAXIMUM_CALL_STRIKE_PRICE_RATIO, GENERAL_UNIT, Math.Rounding.Down) 
-               || strike_.strikePrice < strike_.entryPrice.mulDiv(MINIMUM_CALL_STRIKE_PRICE_RATIO, GENERAL_UNIT, Math.Rounding.Up)){
+            if(strike_.strikePrice > strike_.entryPrice.mulDiv(_maximumCallStrikePriceRatio, GENERAL_UNIT, Math.Rounding.Down) 
+               || strike_.strikePrice < strike_.entryPrice.mulDiv(_minimumCallStrikePriceRatio, GENERAL_UNIT, Math.Rounding.Up)){
                 revert InvalidStrikePrice(address(this), strike_.strikePrice, strike_.entryPrice);
             }
         } else {
-            if(strike_.strikePrice > strike_.entryPrice.mulDiv(MAXIMUM_PUT_STRIKE_PRICE_RATIO, GENERAL_UNIT, Math.Rounding.Down) 
-               || strike_.strikePrice < strike_.entryPrice.mulDiv(MINIMUM_PUT_STRIKE_PRICE_RATIO, GENERAL_UNIT, Math.Rounding.Up)){
+            if(strike_.strikePrice > strike_.entryPrice.mulDiv(_maximumPutStrikePriceRatio, GENERAL_UNIT, Math.Rounding.Down) 
+               || strike_.strikePrice < strike_.entryPrice.mulDiv(_minimumPutStrikePriceRatie, GENERAL_UNIT, Math.Rounding.Up)){
                 revert InvalidStrikePrice(address(this), strike_.strikePrice, strike_.entryPrice);
             }
         }
-        if(strike_.duration > MAXIMUM_DURATION || strike_.duration < MINIMUM_DURATION) {
+        if(strike_.duration > _maximumDuration || strike_.duration < _minimumDuration) {
             revert InvalidDuration(address(this), strike_.duration);
         } 
     }
