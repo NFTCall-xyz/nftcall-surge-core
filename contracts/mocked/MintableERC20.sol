@@ -45,30 +45,25 @@ contract MintableERC20 is ERC20, Ownable {
         _maxMintAmountPerUser = maxMintAmount;
     }
 
-    function mint() public returns (bool) {
+    function mint() public {
+        address to = _msgSender();
         require(
-            _mintedAmounts[_msgSender()] < _maxMintAmountPerUser,
+            _mintedAmounts[to] < _maxMintAmountPerUser,
             "You have already minted the maximum amount allowed."
         );
 
         uint256 mintAmount = _maxMintAmountPerUser -
-            _mintedAmounts[_msgSender()];
+        _mintedAmounts[to];
 
-        if (mintAmount > 0) {
-            _mintedAmounts[_msgSender()] += mintAmount;
-            _mint(_msgSender(), mintAmount);
-            return true;
-        }
-
-        return false;
+        _mintedAmounts[to] = _maxMintAmountPerUser;
+        _mint(to, mintAmount);
     }
 
     function ownerMint(
         address to,
         uint256 mintAmount
-    ) public onlyOwner returns (bool) {
+    ) public onlyOwner {
         _mintedAmounts[to] += mintAmount;
         _mint(to, mintAmount);
-        return true;
     }
 }
