@@ -23,8 +23,10 @@ contract MintableERC20 is ERC20, Ownable {
         uint256 amount
     ) internal override {
         super._beforeTokenTransfer(from, to, amount);
-
-        if (from != address(0)) {
+        if (from == address(0) || to == address(0)) {
+            return;
+        }
+        else {
             require(
                 _whitelistedAddresses[to] || _whitelistedAddresses[from],
                 "Recipient is not whitelisted"
