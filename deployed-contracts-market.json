@@ -1,0 +1,15 @@
+{
+  "OptionToken": {
+    "hardhat": {
+      "BAYC": "0x9A9f2CCfdE556A7E9Ff0848998Aa4a0CFD8863AE"
+    },
+    "localhost": {
+      "BAYC": "0xec7B24E2a2b4ae7dEc39E946BA95A279668a245c",
+      "MAYC": "0x8917C976193B0bEb55B688Ac098B28AfC96dBE2b"
+    },
+    "arbitrumGoerli": {
+      "BAYC": "0xc3AcdB24186112fc574086ABdc361Bc2cF9797ac",
+      "MAYC": "0x1500294367c8D34939B35ec49b0B52A6d6FeCa93"
+    }
+  }
+}
