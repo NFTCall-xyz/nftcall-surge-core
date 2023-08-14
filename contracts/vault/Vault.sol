@@ -500,8 +500,8 @@ contract Vault is IVault, Pausable, Ownable{
             KEEPER_FEE
         );
         vars.caller = _msgSender();
-        emit OpenPosition(vars.caller, onBehalfOf, collection, positionId, eventParameters);
         positionId = vars.optionToken.openPosition(vars.caller, onBehalfOf, optionType, vars.strikeId, amount, maximumPremium);
+        emit OpenPosition(vars.caller, onBehalfOf, collection, positionId, eventParameters);
         IERC20(_asset).safeTransferFrom(vars.caller, address(this), maximumPremium + KEEPER_FEE);
         return (positionId, premium);
     }
