@@ -38,6 +38,18 @@ struct Vault {
     uint256 totalSupply;
     uint256 totalAssets;
     uint256 executionFee;
+    uint256 reserveRatio;
+    uint256 feeRatio;
+    uint256 profitFeeRatio;
+    uint256 timeWindowForActivation;
+    uint256 maximumLockRatio;
+    uint256 maximumCallStrikePriceRatio;
+    uint256 maximumPutStrikePriceRatio;
+    uint256 minimumCallStrikePriceRatio;
+    uint256 minimumPutStrikePriceRatio;
+    uint256 maximumDuration;
+    uint256 minimumDuration;
+    uint256 timeScale;
     uint256 totalLockedAssets;
     int256 unrealizedPNL;
     uint256 unrealizedPremium;

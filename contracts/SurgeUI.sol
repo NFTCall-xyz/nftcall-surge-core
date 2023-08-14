@@ -187,6 +187,26 @@ contract SurgeUI {
         vault_.ncETHPrice = lpTokenInstance.convertToAssets(UNIT);
         vault_.totalSupply = lpTokenInstance.totalSupply();
         vault_.executionFee = vaultInstance.KEEPER_FEE();
+        vault_.reserveRatio = vaultInstance.RESERVE_RATIO();
+        vault_.feeRatio = vaultInstance.feeRatio();
+        vault_.profitFeeRatio = vaultInstance.profitFeeRatio();
+        vault_.timeWindowForActivation = vaultInstance
+            .timeWindowForActivation();
+        vault_.maximumLockRatio = vaultInstance.MAXIMUM_LOCK_RATIO();
+
+        vault_.maximumCallStrikePriceRatio = vaultInstance
+            .MAXIMUM_CALL_STRIKE_PRICE_RATIO();
+        vault_.minimumCallStrikePriceRatio = vaultInstance
+            .MINIMUM_CALL_STRIKE_PRICE_RATIO();
+
+        vault_.maximumPutStrikePriceRatio = vaultInstance
+            .MAXIMUM_PUT_STRIKE_PRICE_RATIO();
+        vault_.minimumPutStrikePriceRatio = vaultInstance
+            .MINIMUM_PUT_STRIKE_PRICE_RATIO();
+
+        vault_.maximumDuration = vaultInstance.MAXIMUM_DURATION();
+        vault_.minimumDuration = vaultInstance.MINIMUM_DURATION();
+        vault_.timeScale = vaultInstance.TIME_SCALE();
         vault_.totalLockedAssets = vaultInstance.totalLockedAssets();
         vault_.unrealizedPNL = vaultInstance.unrealizedPNL();
         vault_.unrealizedPremium = vaultInstance.unrealizedPremium();
