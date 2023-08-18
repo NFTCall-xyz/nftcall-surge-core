@@ -34,7 +34,7 @@
       "address": "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9"
     },
     "arbitrumGoerli": {
-      "address": "0x942C9eAb70BCd3EBEB11Fa47055Dd6A0A0241308"
+      "address": "0x89dE5D43c66b6f26Ce9418CbdFa8352511F20FB7"
     }
   },
   "BlackScholes": {
@@ -45,7 +45,7 @@
       "address": "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707"
     },
     "arbitrumGoerli": {
-      "address": "0x4214765C4d2a17BcB404f602bb5fF3176D56D59F"
+      "address": "0x5b38f133b1D3155539Bb3E612E3426796942D422"
     }
   },
   "OptionPricer": {
@@ -56,7 +56,7 @@
       "address": "0x0165878A594ca255338adfa4d48449f69242Eb8F"
     },
     "arbitrumGoerli": {
-      "address": "0x72F88CB8aD63B0d459AF9267F487eA8D95f1cC5c"
+      "address": "0x21a69aA858A969DBb03bBFb108D44ab94FBA4Bf1"
     }
   },
   "AssetRiskCache": {
@@ -67,7 +67,7 @@
       "address": "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853"
     },
     "arbitrumGoerli": {
-      "address": "0xf98cbfE131CDe38196C664e0C94863E62F2eeEef"
+      "address": "0x2A24E51Ab9c2c510d836EFe086D6d0363431205C"
     }
   },
   "Reserve": {
@@ -78,7 +78,7 @@
       "address": "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6"
     },
     "arbitrumGoerli": {
-      "address": "0xc2c883876e9F35412343f95b9e7Fe6F544c46869"
+      "address": "0xdd9944F5e5A69852c6e979dd079861814fEFDe27"
     }
   },
   "Vault": {
@@ -89,7 +89,7 @@
       "address": "0x8A791620dd6260079BF849Dc5567aDC3F2FdC318"
     },
     "arbitrumGoerli": {
-      "address": "0xEfB7643ea6e973179eA848A33012E49EEdfCff7C"
+      "address": "0xacaaAD3aA96aFECd2Ec40aFac6441A5719eeCC11"
     }
   },
   "operator": {
@@ -108,7 +108,7 @@
       "address": "0x5FbDB2315678afecb367f032d93F642f64180aa3"
     },
     "arbitrumGoerli": {
-      "address": "0xce1A20A75Cb7a69BB20B54b2065A1b482c6380D9"
+      "address": "0x2F63a782306622A371Da50dC913e1F806E90FEe9"
     }
   },
   "MAYC": {
@@ -124,7 +124,7 @@
       "address": "0x68B1D87F95878fE05B998F19b66F4baba5De1aed"
     },
     "arbitrumGoerli": {
-      "address": "0xD8F8a938257b10E7fCCC0f75D245a36211F981BF"
+      "address": "0x429d2f95c59cD1284392401d79c4Fd805fb46777"
     }
   },
   "BackstopPool": {
@@ -132,7 +132,7 @@
       "address": "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6"
     },
     "arbitrumGoerli": {
-      "address": "0xBE0c2db7E556acA3EaB3C29573dCe23A425a60F3"
+      "address": "0x2a759FDB43c9B95eFc4abAB2806fF5a17F1FeE21"
     }
   },
   "SurgeUI": {
