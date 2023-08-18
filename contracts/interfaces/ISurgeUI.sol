@@ -24,8 +24,10 @@ struct VaultLPToken {
     uint256 wETHBalance;
     uint256 wETHAllowance;
     uint256 balance;
+    uint256 allowance;
     uint256 lockedBalance;
     uint256 maxWithdraw;
+    uint256 maxRedeem;
     uint256 releaseTime;
 }
 

@@ -6,7 +6,7 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IVault} from "../interfaces/IVault.sol";
 import {SimpleInitializable} from "../libraries/SimpleInitializable.sol";
-import {GENERAL_UNIT} from "../libraries/DataTypes.sol";
+import {GENERAL_UNIT, UNIT} from "../libraries/DataTypes.sol";
 
 import "../interfaces/ILPToken.sol";
 
@@ -23,6 +23,7 @@ contract LPToken is ILPToken, ERC4626, Ownable, SimpleInitializable {
     uint256 private _minimumAssetToShareRatio = GENERAL_UNIT * 10 / 100; // 10%
     uint256 private _totalLockedBalance = 0;
     uint256 private _totalAssets = 0;
+    uint256 private _wholeWithdrawLimit = 1 * UNIT; // 1 eth;
     uint256 public constant MAXIMUM_WITHDRAW_RATIO = GENERAL_UNIT * 50 / 100; // 50%
     uint256 public constant WITHDRAW_FEE_RATIO = GENERAL_UNIT * 3 / 1000; // 0.3%
     uint256 public constant LOCK_PERIOD = 3 days;
@@ -36,8 +37,8 @@ contract LPToken is ILPToken, ERC4626, Ownable, SimpleInitializable {
     }
 
     modifier onlyVault() {
-        if (msg.sender != _vault) {
-            revert OnlyVault(address(this), msg.sender, _vault);
+        if (_msgSender() != _vault) {
+            revert OnlyVault(address(this), _msgSender(), _vault);
         }
         _;
     }
@@ -48,12 +49,21 @@ contract LPToken is ILPToken, ERC4626, Ownable, SimpleInitializable {
         }
         _vault = vaultAddress;
         _maximumVaultBalance = maxVaultBalance;
-        IERC20(asset()).safeApprove(vaultAddress, type(uint256).max);
         emit Initialize(vaultAddress, maxVaultBalance);
+        IERC20(asset()).safeApprove(vaultAddress, type(uint256).max);
     }
 
     function vault() public view override returns(address) {
         return _vault;
+    }
+
+    function wholeWithdrawLimit() public view override returns(uint256) {
+        return _wholeWithdrawLimit;
+    }
+
+    function setWholeWithdrawLimit(uint256 limit) public override onlyOwner {
+        _wholeWithdrawLimit = limit;
+        emit UpdateWholeWithdrawLimit(limit);
     }
 
     function maximumVaultBalance() public view override returns(uint256) {
@@ -133,6 +143,9 @@ contract LPToken is ILPToken, ERC4626, Ownable, SimpleInitializable {
         if(userBalance == 0) {
             return 0;
         }
+        if(_convertToAssets(userBalance, Math.Rounding.Up) > _wholeWithdrawLimit){
+            userBalance = userBalance.mulDiv(MAXIMUM_WITHDRAW_RATIO, GENERAL_UNIT, Math.Rounding.Down);
+        }
         userBalance = _convertToAssets(userBalance, Math.Rounding.Down);
         return Math.min(userBalance, _maxWithdrawBalance());
     }
@@ -146,12 +159,26 @@ contract LPToken is ILPToken, ERC4626, Ownable, SimpleInitializable {
         if(userBalance == 0) {
             return 0;
         }
+        if(_convertToAssets(userBalance, Math.Rounding.Up) > _wholeWithdrawLimit){
+            userBalance = userBalance.mulDiv(MAXIMUM_WITHDRAW_RATIO, GENERAL_UNIT, Math.Rounding.Down);
+        }
         return Math.min(userBalance, _convertToShares(_maxWithdrawBalance(), Math.Rounding.Down));
     }
 
     function _maxWithdrawBalance() internal view returns (uint256) {
         uint256 _totalLockedAssets = IVault(_vault).totalLockedAssets();
-        return (_totalAssets > _totalLockedAssets) ? (_totalAssets - _totalLockedAssets).mulDiv(MAXIMUM_WITHDRAW_RATIO, GENERAL_UNIT, Math.Rounding.Down) : 0;
+        if (_totalAssets <= _totalLockedAssets) {
+            return 0;
+        }
+        else {
+            uint256 limit = _totalAssets - _totalLockedAssets;
+            if(limit < _wholeWithdrawLimit){
+                return limit;
+            }
+            else {
+                return limit.mulDiv(MAXIMUM_WITHDRAW_RATIO, GENERAL_UNIT, Math.Rounding.Down);
+            }
+        }
     }
 
     function deposit(uint256 assets, address receiver) public override returns(uint256){
@@ -220,16 +247,16 @@ contract LPToken is ILPToken, ERC4626, Ownable, SimpleInitializable {
     }
 
     function untitledAssets() public view override returns(uint256) {
-        return IERC20(asset()).balanceOf(address(this)) - totalAssets();
+        return IERC20(asset()).balanceOf(address(this)) - _totalAssets;
     }
 
-    function collect(address receiver) public override returns(uint256) {
+    function collectUntitledAssets(address receiver) public onlyVault override returns(uint256) {
         uint256 amount = untitledAssets();
         if(amount == 0){
             revert NoAssetsToCollect(address(this));
         }
-        IERC20(asset()).safeTransfer(receiver, amount);
         emit Collect(receiver, amount);
+        IERC20(asset()).safeTransfer(receiver, amount);
         return amount;
     }
 
@@ -279,14 +306,14 @@ contract LPToken is ILPToken, ERC4626, Ownable, SimpleInitializable {
         // shares are burned and after the assets are transferred, which is a valid state.
         _burn(owner, shares);
         uint256 fee = assets.mulDiv(WITHDRAW_FEE_RATIO, GENERAL_UNIT, Math.Rounding.Up);
-        IERC20 erc20Asset = IERC20(asset());
-        address reserve = IVault(_vault).reserve();
-        erc20Asset.safeTransfer(reserve, fee);
         uint256 feeShares = _convertToShares(fee, Math.Rounding.Up);
         _totalAssets -= assets;
-        erc20Asset.safeTransfer(receiver, (assets - fee));
+        IERC20 erc20Asset = IERC20(asset());
+        address reserve = IVault(_vault).reserve();
         emit Withdraw(caller, reserve, owner, fee, feeShares);
         emit Withdraw(caller, receiver, owner, assets - fee, shares - feeShares);
+        erc20Asset.safeTransfer(reserve, fee);
+        erc20Asset.safeTransfer(receiver, (assets - fee));
     }
 
     /**

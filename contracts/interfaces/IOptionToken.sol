@@ -45,6 +45,7 @@ interface IOptionToken {
     function totalValue(OptionType) external view returns(uint256);
     function totalAmount() external view returns(uint256);
     function totalAmount(OptionType) external view returns(uint256);
+    function decimals() external view returns(uint8);
 
     error OnlyVault(address thrower, address caller, address vault);
     error ZeroVaultAddress(address thrower);

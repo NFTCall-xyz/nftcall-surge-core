@@ -1,12 +1,12 @@
 //SPDX-License-Identifier: ISC
 pragma solidity ^0.8.17;
-import "@openzeppelin/contracts/utils/math/Math.sol" as OZMath;
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 /**
- * @title Math
+ * @title LyraMath
  * @author Lyra
  * @dev Library to unify logic for common shared functions
  */
-library Math {
+library LyraMath {
   /// @dev Return the minimum value between the two inputs
   function min(uint x, uint y) internal pure returns (uint) {
     return (x < y) ? x : y;
@@ -48,9 +48,9 @@ library Math {
     }
   }
 
-  function iMulDiv(int a, int b, uint denominator, OZMath.Math.Rounding rounding) internal pure returns(int) {
+  function iMulDiv(int a, int b, uint denominator, Math.Rounding rounding) internal pure returns(int) {
     (int flagA, uint absA) = flagAbs(a);
     (int flagB, uint absB) = flagAbs(b);
-    return flagA * flagB * int(OZMath.Math.mulDiv(absA, absB, denominator, rounding));
+    return flagA * flagB * int(Math.mulDiv(absA, absB, denominator, rounding));
   }
 }

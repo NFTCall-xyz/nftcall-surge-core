@@ -181,7 +181,8 @@ export const processAllMarkets = async () => {
     const markets = await getMarkets();
     let needToUpdatePNL = false;
     for(let market of markets){
-        needToUpdatePNL ||= await processMarket(market);
+        const marketNeedToUpdate = await processMarket(market);
+        needToUpdatePNL ||= marketNeedToUpdate;
     }
     if(needToUpdatePNL) {
         await updatePNL();

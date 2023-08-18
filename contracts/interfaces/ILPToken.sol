@@ -8,8 +8,11 @@ interface ILPToken {
     event Claim(address indexed user, uint256 amount);
     event Collect(address indexed receiver, uint256 amount);
     event UpdateTotalAssets(uint256 amount);
+    event UpdateWholeWithdrawLimit(uint256 limit);
 
     function vault() external view returns(address);
+    function wholeWithdrawLimit() external view returns(uint256);
+    function setWholeWithdrawLimit(uint256 limit) external;
     function maximumVaultBalance() external view returns(uint256);
     function setMaximumVaultBalance(uint256 maxVaultBalance) external;
     function lockedBalanceOf(address user) external view returns(uint256);
@@ -17,7 +20,7 @@ interface ILPToken {
     function setMinimumAssetToShareRatio(uint256 ratio) external;
     function deposit(uint256 assets, address user, address receiver) external returns(uint256);
     function untitledAssets() external view returns(uint256);
-    function collect(address receiver) external returns(uint256);
+    function collectUntitledAssets(address receiver) external returns(uint256);
     function increaseTotalAssets(uint256 amount) external;
     function decreaseTotalAssets(uint256 amount) external;
 
