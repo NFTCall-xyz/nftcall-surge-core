@@ -26,12 +26,12 @@ contract MintableERC20 is ERC20, Ownable {
         if (from == address(0) || to == address(0)) {
             return;
         }
-        else {
-            require(
-                _whitelistedAddresses[to] || _whitelistedAddresses[from],
-                "Recipient is not whitelisted"
-            );
-        }
+        // else {
+        //     require(
+        //         _whitelistedAddresses[to] || _whitelistedAddresses[from],
+        //         "Recipient is not whitelisted"
+        //     );
+        // }
     }
 
     function setWhitelistAddress(

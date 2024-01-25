@@ -2,6 +2,7 @@ import { HardhatUserConfig } from "hardhat/config";
 import path from 'path';
 import fs from 'fs';
 import "@nomicfoundation/hardhat-toolbox";
+require("@nomicfoundation/hardhat-foundry");
 import "dotenv/config";
 
 const SKIP_LOAD = process.env.SKIP_LOAD === "true";
@@ -46,7 +47,7 @@ const config: HardhatUserConfig = {
     arbitrumGoerli: {
       chainId: 421613,
       url: INFURA_KEY ? `https://goerli.infura.io/v3/${INFURA_KEY}` : `https://arb-goerli.g.alchemy.com/v2/${ALCHEMY_API_KEY}`,
-      accounts: [process.env.ARB_GOERLI_PRIVATE_KEY || '', process.env.OPERATOR_PRIVATE_KEY || ''],
+      // accounts: [process.env.ARB_GOERLI_PRIVATE_KEY || '', process.env.OPERATOR_PRIVATE_KEY || ''],
     }
   },
   gasReporter: {
