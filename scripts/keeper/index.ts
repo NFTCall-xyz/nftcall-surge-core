@@ -1,4 +1,3 @@
-import {getDb} from './db';
 import {DRE} from '../utils';
 import { getKeeperHelper, getAddress, getVault, waitTx, getRiskCache, getOptionToken } from '../utils/contracts';
 import { bigNumber, getMarkets } from '../utils';
