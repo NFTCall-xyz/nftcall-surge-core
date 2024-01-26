@@ -98,6 +98,8 @@ contract OptionPricer is IPricer, Ownable, SimpleInitializable {
     if (cr > HALF_PERCENT) {
       adjustedVol += adjustedVol * int(cr - HALF_PERCENT) / int(GENERAL_UNIT);
     }
+    // Require adjusted vol <= 300
+    require(adjustedVol <= 3000, "Adjusted vol exceeds 300 limit");
     return uint(adjustedVol);
   }
 

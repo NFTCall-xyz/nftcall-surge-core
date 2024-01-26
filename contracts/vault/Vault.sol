@@ -64,7 +64,7 @@ contract Vault is IVault, Pausable, Ownable{
     uint256 private _minimumCallStrikePriceRatio = GENERAL_UNIT * 110 / 100; // 110%
     uint256 private _maximumPutStrikePriceRatio = GENERAL_UNIT * 90 / 100; // 90%
     uint256 private _minimumPutStrikePriceRatie = GENERAL_UNIT * 50 / 100; // 50%
-    uint256 public override constant KEEPER_FEE = 5 * 10**13; // 0.00005 ETH
+    uint256 public override constant KEEPER_FEE = 0; // 0 for Blast
     uint256 public override constant TIME_SCALE = 1;
 
     uint256 private _minimumDuration = 3 days;

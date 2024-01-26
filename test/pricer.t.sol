@@ -85,9 +85,6 @@ contract PricerTest is Test {
     }
 
 
-/*     function test_CannotSubtract43() public {
-        vm.expectRevert(stdError.arithmeticError);
-        testNumber -= 43;
-    } */
+
 
 }
