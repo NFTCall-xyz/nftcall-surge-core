@@ -8,7 +8,6 @@ import {BlackScholes} from "./libraries/BlackScholes.sol";
 
 // Inherited
 import {SimpleInitializable} from "./libraries/SimpleInitializable.sol";
-import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 // Interfaces
@@ -19,7 +18,7 @@ import {IAssetRiskCache} from "./interfaces/IAssetRiskCache.sol";
  * @author NFTCall
  * @dev Update Delta and PNL for every collection
  */
-contract AssetRiskCache is IAssetRiskCache, Ownable, SimpleInitializable, ReentrancyGuard {
+contract AssetRiskCache is IAssetRiskCache, Ownable, SimpleInitializable {
   using DecimalMath for uint;
   using SignedDecimalMath for int;
   using BlackScholes for BlackScholes.BlackScholesInputs;
