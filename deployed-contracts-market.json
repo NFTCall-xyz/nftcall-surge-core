@@ -10,6 +10,10 @@
     "arbitrumGoerli": {
       "BAYC": "0x8Cded2C05EA212B272540D6596b88934391687A2",
       "MAYC": "0x32202C27588279752e6288eB2987AeaB39631dA9"
+    },
+    "blastSepolia": {
+      "BAYC": "0x4FA14Fc9d723f5c2746Cae19e44A8f0804E2338d",
+      "MAYC": "0x55D71D67a1c8C1A04bc3f6eA666EFAC48fa464e5"
     }
   }
 }

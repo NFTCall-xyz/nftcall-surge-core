@@ -7,6 +7,7 @@
     "compile": "SKIP_LOAD=true hardhat compile",
     "hardhat:localhost": "hardhat --network localhost",
     "hardhat:arbitrumTest": "hardhat --network arbitrumGoerli",
+    "hardhat:blastSepolia": "hardhat --network blastSepolia",
     "ncsurge:dev:localhost": "yarn run compile && yarn run hardhat:localhost dev:full",
     "ncsurge:dev:arbitrumTest": "yarn run compile && yarn run hardhat:arbitrumTest dev:full",
     "test": "yarn run compile && hardhat test"

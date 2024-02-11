@@ -44,6 +44,7 @@ task('dev:full', 'Deploy all contracts')
         await hre.run('pricer:deploy', { verify });
         await hre.run('riskCache:deploy', { verify });
         await hre.run('reserve:deploy', { verify });
+        await hre.run('backstopPool:deploy', { verify });
         await hre.run('vault:deploy', { verify, asset: lpAsset });
         await hre.run('lpToken:init', { maximumSupply: '10000000' });
         await hre.run('mocked:erc20:init', {symbol: lpAsset, limit: "10"});
@@ -66,7 +67,7 @@ task('dev:full', 'Deploy all contracts')
             await hre.run('optionToken:init', {market: nft});
             await hre.run('vault:initMarket', {market: nft, weight: market.weight.toString()});
         }
-        await hre.run('keeperHelper.deploy');
+        await hre.run('keeperHelper:deploy', { verify });
     });
 
 task('dev:update', 'Deploy updated contracts')
@@ -118,5 +119,5 @@ task('dev:update', 'Deploy updated contracts')
             await hre.run('vault:initMarket', {market: nft, weight: market.weight.toString()});
         }
         await hre.run('riskCache:init');
-        await hre.run('keeperHelper:deploy', { verify});
+        await hre.run('keeperHelper:deploy', { verify });
     });

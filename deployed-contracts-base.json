@@ -13,6 +13,9 @@
     },
     "arbitrumGoerli": {
       "address": "0x445b465bA8E68C6f2d50C29DB5B629E40F6e9978"
+    },
+    "blastSepolia": {
+      "address": "0xBC4CA0EdA7647A8aB7C2061c2E118A18a936f13D"
     }
   },
   "NFTCallOracle": {
@@ -24,6 +27,9 @@
     },
     "arbitrumGoerli": {
       "address": "0xe8aeafE1022D835D0a831757c477a910D86e84a6"
+    },
+    "blastSepolia": {
+      "address": "0xBb44CFD2Fc54CC50e0D19e64B1E168fE560EAc4B"
     }
   },
   "LPToken": {
@@ -35,6 +41,9 @@
     },
     "arbitrumGoerli": {
       "address": "0x89dE5D43c66b6f26Ce9418CbdFa8352511F20FB7"
+    },
+    "blastSepolia": {
+      "address": "0x2637C8e5934c2464D24640aEe5754cf2897c7702"
     }
   },
   "BlackScholes": {
@@ -46,6 +55,9 @@
     },
     "arbitrumGoerli": {
       "address": "0x5b38f133b1D3155539Bb3E612E3426796942D422"
+    },
+    "blastSepolia": {
+      "address": "0x1923a8E694dF2af990F3cbd3BAA2707C43A312A1"
     }
   },
   "OptionPricer": {
@@ -57,6 +69,9 @@
     },
     "arbitrumGoerli": {
       "address": "0x21a69aA858A969DBb03bBFb108D44ab94FBA4Bf1"
+    },
+    "blastSepolia": {
+      "address": "0xE0b47573974cE85559f257090fE0d37f1D4f2846"
     }
   },
   "AssetRiskCache": {
@@ -68,6 +83,9 @@
     },
     "arbitrumGoerli": {
       "address": "0x2A24E51Ab9c2c510d836EFe086D6d0363431205C"
+    },
+    "blastSepolia": {
+      "address": "0x63c7473aA8A5939681F01E06Ca351f42ef9e6c85"
     }
   },
   "Reserve": {
@@ -79,6 +97,9 @@
     },
     "arbitrumGoerli": {
       "address": "0xdd9944F5e5A69852c6e979dd079861814fEFDe27"
+    },
+    "blastSepolia": {
+      "address": "0x62a4ab713EA8c5BeB17Ca1009F721ED3d777FEB3"
     }
   },
   "Vault": {
@@ -90,6 +111,9 @@
     },
     "arbitrumGoerli": {
       "address": "0xacaaAD3aA96aFECd2Ec40aFac6441A5719eeCC11"
+    },
+    "blastSepolia": {
+      "address": "0xd667b17296a5b223B3729F0edEEDe336bD08c72f"
     }
   },
   "operator": {
@@ -98,6 +122,9 @@
     },
     "arbitrumGoerli": {
       "address": "0x65a7050AC6b5Cf745846f4C5a7Bf99aB1B279C2d"
+    },
+    "blastSepolia": {
+      "address": "0x55D6F9114ad4f9ADf75aa917b7482aE5dfAe6342"
     }
   },
   "WETH": {
@@ -109,6 +136,9 @@
     },
     "arbitrumGoerli": {
       "address": "0x2F63a782306622A371Da50dC913e1F806E90FEe9"
+    },
+    "blastSepolia": {
+      "address": "0xdB097cc1088D70B61916Fd33D7fFeA543a531FBC"
     }
   },
   "MAYC": {
@@ -117,6 +147,9 @@
     },
     "arbitrumGoerli": {
       "address": "0x88898d1596204a25C93CE4832D3fB98A99058Fe8"
+    },
+    "blastSepolia": {
+      "address": "0x60E4d786628Fea6478F785A6d7e704777c86a7c6"
     }
   },
   "KeeperHelper": {
@@ -125,6 +158,9 @@
     },
     "arbitrumGoerli": {
       "address": "0x429d2f95c59cD1284392401d79c4Fd805fb46777"
+    },
+    "blastSepolia": {
+      "address": "0xA6b00f5d9da23C9c12eA3d659b6B20887C580863"
     }
   },
   "BackstopPool": {
@@ -133,6 +169,9 @@
     },
     "arbitrumGoerli": {
       "address": "0x2a759FDB43c9B95eFc4abAB2806fF5a17F1FeE21"
+    },
+    "blastSepolia": {
+      "address": "0xbea868Dd020732d09a6662E0C5Acd31A069Ce5f2"
     }
   },
   "SurgeUI": {
@@ -141,6 +180,9 @@
     },
     "arbitrumGoerli": {
       "address": "0xd4c1B23e3Cc95D19B46Afcee1239B52473A8b6cC"
+    },
+    "blastSepolia": {
+      "address": "0x86Bd4adfeec807afeB74eB2b5DE56E4836ce71BF"
     }
   }
 }

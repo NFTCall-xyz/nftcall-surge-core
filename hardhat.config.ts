@@ -48,6 +48,12 @@ const config: HardhatUserConfig = {
       chainId: 421613,
       url: INFURA_KEY ? `https://goerli.infura.io/v3/${INFURA_KEY}` : `https://arb-goerli.g.alchemy.com/v2/${ALCHEMY_API_KEY}`,
       // accounts: [process.env.ARB_GOERLI_PRIVATE_KEY || '', process.env.OPERATOR_PRIVATE_KEY || ''],
+    },
+    blastSepolia: {
+      chainId: 168587773,
+      url: "https://sepolia.blast.io",
+      accounts: [process.env.OWNER_PRIVATE_KEY as string, process.env.OPERATOR_PRIVATE_KEY as string],
+      gasPrice: 1000000000,
     }
   },
   gasReporter: {
