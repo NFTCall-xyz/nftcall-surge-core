@@ -71,7 +71,7 @@
       "address": "0x21a69aA858A969DBb03bBFb108D44ab94FBA4Bf1"
     },
     "blastSepolia": {
-      "address": "0xE0b47573974cE85559f257090fE0d37f1D4f2846"
+      "address": "0x5cCAA73AC1CAA6A2809EcC5D92c9154aC457CF4F"
     }
   },
   "AssetRiskCache": {
@@ -113,7 +113,7 @@
       "address": "0xacaaAD3aA96aFECd2Ec40aFac6441A5719eeCC11"
     },
     "blastSepolia": {
-      "address": "0xd667b17296a5b223B3729F0edEEDe336bD08c72f"
+      "address": "0x420F8E5C1943C97ed51137D71973a6175e426Df8"
     }
   },
   "operator": {
