@@ -67,6 +67,7 @@ task('dev:full', 'Deploy all contracts')
             await hre.run('optionToken:init', {market: nft});
             await hre.run('vault:initMarket', {market: nft, weight: market.weight.toString()});
         }
+        await hre.run('riskCache:init');
         await hre.run('keeperHelper:deploy', { verify });
     });
 
